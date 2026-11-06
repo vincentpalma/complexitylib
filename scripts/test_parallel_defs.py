@@ -43,6 +43,14 @@ ALIAS = {"alias": "Cslib.MCSP.MCSPAt", "am": "Complexity.MCSP.Magnification", "a
 
 
 class ChangedLinesTests(unittest.TestCase):
+    def test_module_paths_use_either_separator(self) -> None:
+        for path in ("Complexity/Logics/Resolution.lean", r"Complexity\Logics\Resolution.lean"):
+            with self.subTest(path=path):
+                module = p.module_of(path)
+                self.assertEqual(module, "Complexity.Logics.Resolution")
+                self.assertEqual(p.requests([module], {"Complexity/Logics/Resolution.lean": None}, []),
+                                 "lines Complexity.Logics.Resolution *\n")
+
     def test_added_ranges(self) -> None:
         diff = ("diff --git a/X.lean b/X.lean\n@@ -1,2 +0,0 @@\n-x\n-y\n@@ -3 +3 @@\n-a\n+b\n"
                 "@@ -10,0 +11,2 @@\n+c\n+d\n@@ -20,2 +22,0 @@\n-e\n-f\n@@ -30,2 +31 @@\n")

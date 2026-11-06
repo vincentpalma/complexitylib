@@ -160,7 +160,7 @@ class Group:
 # --- What to examine ----------------------------------------------------------------------------
 
 def module_of(path: str) -> str:
-    return path.removesuffix(".lean").replace("/", ".")
+    return path.removesuffix(".lean").replace("\\", "/").replace("/", ".")
 
 
 def path_of(module: str) -> str:
