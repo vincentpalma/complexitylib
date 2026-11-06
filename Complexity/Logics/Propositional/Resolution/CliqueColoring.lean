@@ -124,7 +124,7 @@ theorem CNF.not_satisfiable_cliqueColoring (hr : r < k) :
 clique–colouring formula with at most `s` lines gives a monotone circuit with at most `2 s` gates
 separating the graphs with a `k`-clique from the `r`-colourable graphs. -/
 theorem CNF.exists_separates_of_refutableInSize_cliqueColoring {s : ℕ}
-    (h : (CNF.cliqueColoring n k r).RefutableInSize s) :
+    (h : (CNF.cliqueColoring n k r).toClauseSet.RefutableInSize s) :
     ∃ C : Circuit Monotone.signature (edgeCount n) 1, C.size ≤ 2 * s ∧
       Separates k r fun x => C.eval Monotone.interpretation x 0 := by
   obtain ⟨C, hsize, hC⟩ := h.exists_monotone_interpolant_of_positive
@@ -140,7 +140,7 @@ theorem CNF.lt_two_mul_of_refutableInSize_cliqueColoring {p w t s : ℕ} (hp : 2
     (hw : 2 ≤ w) (hk : w + 1 ≤ k) (hr : 2 * w ^ 2 ≤ k - 1)
     (hpos : Positive.errorCap n k p w * t < n.choose k)
     (hneg : 2 * negativeGateCap n (k - 1) p w * t < (k - 1) ^ n)
-    (h : (CNF.cliqueColoring n k (k - 1)).RefutableInSize s) : t < 2 * s := by
+    (h : (CNF.cliqueColoring n k (k - 1)).toClauseSet.RefutableInSize s) : t < 2 * s := by
   obtain ⟨C, hsize, hC⟩ := CNF.exists_separates_of_refutableInSize_cliqueColoring h
   exact (lt_size_of_separates hp hw hk hr hpos hneg hC).trans_le hsize
 
@@ -149,7 +149,7 @@ theorem CNF.lt_two_mul_of_refutableInSize_cliqueColoring {p w t s : ℕ} (hp : 2
 `Clique_{n,k} ∧ Color_{n,k-1}` has more than `64 ^ w / 2` lines. -/
 theorem CNF.sixtyFour_pow_lt_two_mul_of_refutableInSize_cliqueColoring {w s : ℕ} (hw : 16 ≤ w)
     (hk : 4 * w ^ 2 ≤ k - 1) (hn : 64 * w ^ 6 * k ≤ n)
-    (h : (CNF.cliqueColoring n k (k - 1)).RefutableInSize s) : 64 ^ w < 2 * s := by
+    (h : (CNF.cliqueColoring n k (k - 1)).toClauseSet.RefutableInSize s) : 64 ^ w < 2 * s := by
   obtain ⟨C, hsize, hC⟩ := CNF.exists_separates_of_refutableInSize_cliqueColoring h
   exact (Monotone.pow_lt_size_of_separates hw hk hn hC).trans_le hsize
 
@@ -157,7 +157,8 @@ theorem CNF.sixtyFour_pow_lt_two_mul_of_refutableInSize_cliqueColoring {w s : �
 every resolution refutation of `Clique_{n,k} ∧ Color_{n,k-1}` has at least `(n.choose 2 - 1) / 2`
 lines: every edge is essential to the interpolant. -/
 theorem CNF.edgeCount_le_one_add_two_mul_of_refutableInSize_cliqueColoring {s : ℕ}
-    (hk : 2 ≤ k) (hkn : k ≤ n) (h : (CNF.cliqueColoring n k (k - 1)).RefutableInSize s) :
+    (hk : 2 ≤ k) (hkn : k ≤ n)
+    (h : (CNF.cliqueColoring n k (k - 1)).toClauseSet.RefutableInSize s) :
     edgeCount n ≤ 1 + 2 * s := by
   obtain ⟨C, hsize, hC⟩ := CNF.exists_separates_of_refutableInSize_cliqueColoring h
   exact (Monotone.edgeCount_le_succ_size_of_separates hk hkn hC).trans (by omega)
@@ -166,7 +167,8 @@ theorem CNF.edgeCount_le_one_add_two_mul_of_refutableInSize_cliqueColoring {s : 
 every resolution refutation of `Clique_{n,k} ∧ Color_{n,k-1}` has more than `2 ^ (2 ⌊√k⌋) / 2`
 lines. -/
 theorem CNF.two_pow_two_mul_sqrt_lt_two_mul_of_refutableInSize_cliqueColoring {s : ℕ}
-    (hk : 2 ≤ k) (hn : k ^ 4 ≤ n) (h : (CNF.cliqueColoring n k (k - 1)).RefutableInSize s) :
+    (hk : 2 ≤ k) (hn : k ^ 4 ≤ n)
+    (h : (CNF.cliqueColoring n k (k - 1)).toClauseSet.RefutableInSize s) :
     2 ^ (2 * Nat.sqrt k) < 2 * s := by
   obtain ⟨C, hsize, hC⟩ := CNF.exists_separates_of_refutableInSize_cliqueColoring h
   exact (Monotone.two_pow_two_mul_sqrt_lt_size_of_separates hk hn hC).trans_le hsize
@@ -177,7 +179,7 @@ theorem CNF.two_pow_two_mul_sqrt_lt_two_mul_of_refutableInSize_cliqueColoring {s
 `n^{1/8}`. -/
 theorem CNF.two_pow_lt_two_mul_of_refutableInSize_cliqueColoring_sqrt {s : ℕ}
     (hn : 16 ≤ n)
-    (h : (CNF.cliqueColoring n n.sqrt.sqrt (n.sqrt.sqrt - 1)).RefutableInSize s) :
+    (h : (CNF.cliqueColoring n n.sqrt.sqrt (n.sqrt.sqrt - 1)).toClauseSet.RefutableInSize s) :
     2 ^ (2 * n.sqrt.sqrt.sqrt) < 2 * s := by
   refine CNF.two_pow_two_mul_sqrt_lt_two_mul_of_refutableInSize_cliqueColoring ?_ ?_ h
   · exact Nat.le_sqrt.2 (Nat.le_sqrt.2 (by omega))
@@ -191,7 +193,7 @@ theorem CNF.two_pow_lt_two_mul_of_refutableInSize_cliqueColoring_sqrt {s : ℕ}
 than `2 ^ l / 2` lines. -/
 theorem CNF.two_pow_lt_two_mul_of_refutableInSize_cliqueColoring {l s : ℕ} (hl : 2 ≤ l)
     (hr : 2 * l ^ 2 ≤ r) (hrk : r < k) (hn : 8 * l * (Nat.log 2 n + 3) * k ≤ n)
-    (h : (CNF.cliqueColoring n k r).RefutableInSize s) : 2 ^ l < 2 * s := by
+    (h : (CNF.cliqueColoring n k r).toClauseSet.RefutableInSize s) : 2 ^ l < 2 * s := by
   obtain ⟨C, hsize, hC⟩ := CNF.exists_separates_of_refutableInSize_cliqueColoring h
   exact (Monotone.two_pow_lt_size_of_separates hl hr hrk hn hC).trans_le hsize
 
@@ -201,7 +203,7 @@ theorem CNF.two_pow_lt_two_mul_of_refutableInSize_cliqueColoring {l s : ℕ} (hl
 `2 ^ (⌊√⌊√n⌋⌋ / 2) / 2` lines. -/
 theorem CNF.two_pow_lt_two_mul_of_refutableInSize_cliqueColoring_of_sqrt_lt {s : ℕ}
     (hn : 2 ^ 40 ≤ n) (hk : n.sqrt < k) (hk' : k ≤ n.sqrt + 2)
-    (h : (CNF.cliqueColoring n k (k - 1)).RefutableInSize s) :
+    (h : (CNF.cliqueColoring n k (k - 1)).toClauseSet.RefutableInSize s) :
     2 ^ (n.sqrt.sqrt / 2) < 2 * s := by
   obtain ⟨C, hsize, hC⟩ := CNF.exists_separates_of_refutableInSize_cliqueColoring h
   exact (Monotone.two_pow_lt_size_of_separates_sqrt hn hk hk' hC).trans_le hsize

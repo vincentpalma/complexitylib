@@ -64,7 +64,7 @@ variable {V D : Type*} [Fintype V] [DecidableEq V] [Fintype D] [DecidableEq D]
 [Ben-Sasson and Wigderson][BenSassonWigderson2001]: if `h(G) > 0`, every resolution
 refutation of a Tseitin formula on `G` has width at least `h(G) |V| / 3`. -/
 theorem edgeExpansion_mul_card_div_three_le_of_refutableInWidth (hG : 0 < G.edgeExpansion)
-    {χ : V → Bool} {w : ℕ} (h : (CNF.tseitinFormula G.edgeEnds χ).RefutableInWidth w) :
+    {χ : V → Bool} {w : ℕ} (h : (CNF.tseitinFormula G.edgeEnds χ).toClauseSet.RefutableInWidth w) :
     G.edgeExpansion * Fintype.card V / 3 ≤ w := by
   have hc := G.connected_toSimpleGraph_of_edgeExpansion_pos hG
   rw [← G.toSimpleGraph_edgeEnds] at hc
@@ -77,7 +77,7 @@ theorem edgeExpansion_mul_card_div_three_le_of_refutableInWidth (hG : 0 < G.edge
 `exp ((h(G) |V| / 3 - |D| - 2)² / (8 |V| |D|))` lines. -/
 theorem exp_edgeExpansion_le_of_refutableInSize
     (hG : Fintype.card D + 2 ≤ G.edgeExpansion * Fintype.card V / 3) {χ : V → Bool} {s : ℕ}
-    (hs : (CNF.tseitinFormula G.edgeEnds χ).RefutableInSize s) :
+    (hs : (CNF.tseitinFormula G.edgeEnds χ).toClauseSet.RefutableInSize s) :
     Real.exp ((G.edgeExpansion * Fintype.card V / 3 - Fintype.card D - 2) ^ 2 /
       (8 * Fintype.card V * Fintype.card D)) ≤ s := by
   have hh : 0 < G.edgeExpansion := by
@@ -114,8 +114,8 @@ refutations of `2 ^ Ω(n)` lines** [Urquhart][Urquhart1987]
 non-constructively. -/
 theorem exists_forall_refutableInSize_exp_le :
     ∀ n ≥ 4392000, ∃ m ≤ 120 * n, ∃ φ : CNF (Fin m),
-      φ.length ≤ 2 ^ 120 * n ∧ (∀ c ∈ φ, c.width ≤ 120) ∧ ¬ φ.Satisfiable ∧
-      ∀ s, φ.RefutableInSize s → Real.exp (n / (960 * 36000 ^ 2)) ≤ s := by
+      φ.length ≤ 2 ^ 120 * n ∧ (∀ c ∈ φ, c.toFinset.card ≤ 120) ∧ ¬ φ.Satisfiable ∧
+      ∀ s, φ.toClauseSet.RefutableInSize s → Real.exp (n / (960 * 36000 ^ 2)) ≤ s := by
   intro n hn
   have : NeZero n := ⟨by omega⟩
   have : Nontrivial (Fin n) := Fin.nontrivial_iff_two_le.2 (by omega)

@@ -57,7 +57,7 @@ example : ∃ C : Circuit Monotone.signature (edgeCount (2 ^ 21)) 1,
 
 /-- **Fewer colours than `k - 1`**: on `2 ^ 21` vertices, every resolution refutation of
 `Clique_{n,600} ∧ Color_{n,512}` has more than `2 ^ 16 / 2` lines. -/
-example {s : ℕ} (h : (CNF.cliqueColoring (2 ^ 21) 600 512).RefutableInSize s) :
+example {s : ℕ} (h : (CNF.cliqueColoring (2 ^ 21) 600 512).toClauseSet.RefutableInSize s) :
     2 ^ 16 < 2 * s := by
   refine CNF.two_pow_lt_two_mul_of_refutableInSize_cliqueColoring (by norm_num) (by norm_num)
     (by norm_num) ?_ h
@@ -76,11 +76,13 @@ private theorem sqrt_two_pow_twenty : (2 ^ 20 : ℕ).sqrt = 2 ^ 10 := by
 
 /-- **The `n^{1/4}` resolution bound instantiated** at `n = 2 ^ 40` and `k = ⌊√n⌋ + 1`: the
 clique–colouring formula is refutable, and every refutation has more than `2 ^ 512 / 2` lines. -/
-example : (∃ s, (CNF.cliqueColoring (2 ^ 40) (2 ^ 20 + 1) (2 ^ 20)).RefutableInSize s) ∧
-    ∀ s, (CNF.cliqueColoring (2 ^ 40) (2 ^ 20 + 1) (2 ^ 20)).RefutableInSize s →
+example : (∃ s, (CNF.cliqueColoring (2 ^ 40) (2 ^ 20 + 1) (2 ^ 20)).toClauseSet.RefutableInSize s) ∧
+    ∀ s, (CNF.cliqueColoring (2 ^ 40) (2 ^ 20 + 1) (2 ^ 20)).toClauseSet.RefutableInSize s →
       2 ^ 512 < 2 * s := by
-  refine ⟨CNF.exists_refutableInSize_iff_not_satisfiable.2
-    (CNF.not_satisfiable_cliqueColoring (by norm_num)), fun s h => ?_⟩
+  refine ⟨ClauseSet.exists_refutableInSize_iff_not_satisfiable.2
+    (by
+        rw [CNF.satisfiable_toClauseSet_iff]
+        exact CNF.not_satisfiable_cliqueColoring (by norm_num)), fun s h => ?_⟩
   have := CNF.two_pow_lt_two_mul_of_refutableInSize_cliqueColoring_of_sqrt_lt (n := 2 ^ 40)
     (k := 2 ^ 20 + 1) le_rfl (by rw [sqrt_two_pow_forty]; norm_num)
     (by rw [sqrt_two_pow_forty]; norm_num) h

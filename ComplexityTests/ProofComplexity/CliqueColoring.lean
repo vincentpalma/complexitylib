@@ -73,10 +73,12 @@ private abbrev vertices : ℕ := 64 * 16 ^ 6 * 1025
 
 /-- **The `64 ^ w` bound instantiated**: at `w = 16`, `k = 1025` and `n = 64 * 16 ^ 6 * 1025`, the
 clique–colouring formula is refutable, and every refutation has more than `64 ^ 16 / 2` lines. -/
-example : (∃ s, (CNF.cliqueColoring vertices 1025 1024).RefutableInSize s) ∧
-    ∀ s, (CNF.cliqueColoring vertices 1025 1024).RefutableInSize s → 64 ^ 16 < 2 * s :=
-  ⟨CNF.exists_refutableInSize_iff_not_satisfiable.2
-      (CNF.not_satisfiable_cliqueColoring (by norm_num)),
+example : (∃ s, (CNF.cliqueColoring vertices 1025 1024).toClauseSet.RefutableInSize s) ∧
+    ∀ s, (CNF.cliqueColoring vertices 1025 1024).toClauseSet.RefutableInSize s → 64 ^ 16 < 2 * s :=
+  ⟨ClauseSet.exists_refutableInSize_iff_not_satisfiable.2
+      (by
+        rw [CNF.satisfiable_toClauseSet_iff]
+        exact CNF.not_satisfiable_cliqueColoring (by norm_num)),
     fun _ h => CNF.sixtyFour_pow_lt_two_mul_of_refutableInSize_cliqueColoring (k := 1025)
       (by norm_num) (by norm_num) le_rfl h⟩
 
@@ -94,10 +96,12 @@ private theorem sqrt_two : Nat.sqrt 2 = 1 := (Nat.eq_sqrt.2 ⟨by norm_num, by n
 
 /-- **Small cliques**: at `k = 2` and `n = 16`, the clique–colouring formula is refutable, and every
 refutation with `s` lines has `2 ^ (2 ⌊√2⌋) < 2 s` and `C(16, 2) = 120 ≤ 1 + 2 s`, so `s ≥ 60`. -/
-example : (∃ s, (CNF.cliqueColoring 16 2 1).RefutableInSize s) ∧
-    ∀ s, (CNF.cliqueColoring 16 2 1).RefutableInSize s → 4 < 2 * s ∧ 60 ≤ s := by
-  refine ⟨CNF.exists_refutableInSize_iff_not_satisfiable.2
-    (CNF.not_satisfiable_cliqueColoring (by norm_num)), fun s h => ⟨?_, ?_⟩⟩
+example : (∃ s, (CNF.cliqueColoring 16 2 1).toClauseSet.RefutableInSize s) ∧
+    ∀ s, (CNF.cliqueColoring 16 2 1).toClauseSet.RefutableInSize s → 4 < 2 * s ∧ 60 ≤ s := by
+  refine ⟨ClauseSet.exists_refutableInSize_iff_not_satisfiable.2
+    (by
+        rw [CNF.satisfiable_toClauseSet_iff]
+        exact CNF.not_satisfiable_cliqueColoring (by norm_num)), fun s h => ⟨?_, ?_⟩⟩
   · simpa [sqrt_two] using
       CNF.two_pow_two_mul_sqrt_lt_two_mul_of_refutableInSize_cliqueColoring (k := 2) le_rfl
         (by norm_num) h

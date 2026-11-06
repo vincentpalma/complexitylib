@@ -42,18 +42,18 @@ example : A.appendShared B =
   decide
 
 /-- Resolve on `y` to `x`, on `z` to `¬x`, and on `x` to the empty clause. -/
-private theorem isProof : (A.appendShared B).IsProof
-    [[], [(x, false)], [(x, true)], [(z, false), (x, false)], [(z, true)],
-      [(y, false), (x, true)], [(y, true)]] := by
-  have h₄ : (A.appendShared B).IsProof
-      [[(z, false), (x, false)], [(z, true)], [(y, false), (x, true)], [(y, true)]] :=
-    (((CNF.IsProof.nil.mem (by decide)).mem (by decide)).mem (by decide)).mem (by decide)
-  have h₅ := h₄.resolvent (c₁ := [(y, true)]) (c₂ := [(y, false), (x, true)]) y (by decide)
+private theorem isProof : (A.appendShared B).toClauseSet.IsProof
+    [∅, {(x, false)}, {(x, true)}, {(z, false), (x, false)}, {(z, true)},
+      {(y, false), (x, true)}, {(y, true)}] := by
+  have h₄ : (A.appendShared B).toClauseSet.IsProof
+      [{(z, false), (x, false)}, {(z, true)}, {(y, false), (x, true)}, {(y, true)}] :=
+    (((ClauseSet.IsProof.nil.mem (by decide)).mem (by decide)).mem (by decide)).mem (by decide)
+  have h₅ := h₄.resolvent (c₁ := {(y, true)}) (c₂ := {(y, false), (x, true)}) y (by decide)
     (by decide) (by decide) (by decide)
-  have h₆ := h₅.resolvent (c₁ := [(z, true)]) (c₂ := [(z, false), (x, false)]) z (by decide)
+  have h₆ := h₅.resolvent (c₁ := {(z, true)}) (c₂ := {(z, false), (x, false)}) z (by decide)
     (by decide) (by decide) (by decide)
-  exact h₆.resolvent (c₁ := [(x, true)]) (c₂ := [(x, false)]) x (by decide) (by decide)
-    (by decide) (by decide)
+  convert h₆.resolvent (c₁ := {(x, true)}) (c₂ := {(x, false)}) x (by decide) (by decide)
+    (by decide) (by decide) using 1; decide
 
 /-- Every model of `A` sets `x`. -/
 private theorem eq_true_of_eval_A {a : Fin 1 → Bool} {y : Unit → Bool}
@@ -110,7 +110,7 @@ example : ∃ C : Circuit Boolean.signature 1 1, C.size ≤ 28 ∧
 /-- The same bound from refutation size. -/
 example : ∃ C : Circuit Boolean.signature 1 1, C.size ≤ 28 ∧
     A.IsInterpolant B fun a => C.eval Boolean.interpretation a 0 :=
-  CNF.RefutableInSize.exists_interpolant ⟨_, isProof, by decide, le_rfl⟩
+  ClauseSet.RefutableInSize.exists_interpolant ⟨_, isProof, by decide, le_rfl⟩
 
 /-! ### Monotone interpolants -/
 
@@ -140,7 +140,7 @@ example : ∃ C : Circuit Monotone.signature 1 1, C.size ≤ 14 ∧
 
 example : ∃ C : Circuit Monotone.signature 1 1, C.size ≤ 14 ∧
     A.IsInterpolant B fun a => C.eval Monotone.interpretation a 0 :=
-  CNF.RefutableInSize.exists_monotone_interpolant_of_positive ⟨_, isProof, by decide, le_rfl⟩
+  ClauseSet.RefutableInSize.exists_monotone_interpolant_of_positive ⟨_, isProof, by decide, le_rfl⟩
     positive
 
 /-- `A` and `B` with the polarity of `x` swapped: `y ∧ (y → ¬x)` and `z ∧ (z → x)`. -/
@@ -148,20 +148,20 @@ private def A' : CNF (Fin 1 ⊕ Unit) := [[(.inr (), true)], [(.inr (), false), 
 private def B' : CNF (Fin 1 ⊕ Unit) := [[(.inr (), true)], [(.inr (), false), (.inl 0, true)]]
 
 /-- The swapped formula has a seven-line refutation, but neither polarity hypothesis holds. -/
-example : (A'.appendShared B').RefutableInSize 7 ∧
+example : (A'.appendShared B').toClauseSet.RefutableInSize 7 ∧
     ¬ (∀ d ∈ A', ∀ i b, (.inl i, b) ∈ d → b = true) ∧
     ¬ (∀ d ∈ B', ∀ i b, (.inl i, b) ∈ d → b = false) := by
-  refine ⟨⟨[[], [(x, true)], [(x, false)], [(z, false), (x, true)], [(z, true)],
-    [(y, false), (x, false)], [(y, true)]], ?_, by decide, le_rfl⟩, by decide, by decide⟩
-  have h₄ : (A'.appendShared B').IsProof
-      [[(z, false), (x, true)], [(z, true)], [(y, false), (x, false)], [(y, true)]] :=
-    (((CNF.IsProof.nil.mem (by decide)).mem (by decide)).mem (by decide)).mem (by decide)
-  have h₅ := h₄.resolvent (c₁ := [(y, true)]) (c₂ := [(y, false), (x, false)]) y (by decide)
+  refine ⟨⟨[∅, {(x, true)}, {(x, false)}, {(z, false), (x, true)}, {(z, true)},
+    {(y, false), (x, false)}, {(y, true)}], ?_, by decide, le_rfl⟩, by decide, by decide⟩
+  have h₄ : (A'.appendShared B').toClauseSet.IsProof
+      [{(z, false), (x, true)}, {(z, true)}, {(y, false), (x, false)}, {(y, true)}] :=
+    (((ClauseSet.IsProof.nil.mem (by decide)).mem (by decide)).mem (by decide)).mem (by decide)
+  have h₅ := h₄.resolvent (c₁ := {(y, true)}) (c₂ := {(y, false), (x, false)}) y (by decide)
     (by decide) (by decide) (by decide)
-  have h₆ := h₅.resolvent (c₁ := [(z, true)]) (c₂ := [(z, false), (x, true)]) z (by decide)
+  have h₆ := h₅.resolvent (c₁ := {(z, true)}) (c₂ := {(z, false), (x, true)}) z (by decide)
     (by decide) (by decide) (by decide)
-  exact h₆.resolvent (c₁ := [(x, true)]) (c₂ := [(x, false)]) x (by decide) (by decide)
-    (by decide) (by decide)
+  convert h₆.resolvent (c₁ := {(x, true)}) (c₂ := {(x, false)}) x (by decide) (by decide)
+    (by decide) (by decide) using 1; decide
 
 /-- No monotone circuit is an interpolant of the swapped formula: an interpolant is `true` at
 `x = false` and `false` at `x = true`. -/

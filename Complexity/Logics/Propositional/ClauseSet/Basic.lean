@@ -7,7 +7,7 @@ Authors: Samuel Schlesinger
 module
 -- upstream: candidate
 
-public import Complexity.Logics.Propositional.CNF
+public import Complexity.Logics.Propositional.FiniteClause
 public import Mathlib.Data.Finset.Card
 public import Mathlib.Data.Fintype.Pi
 public import Mathlib.Data.Fintype.Prod
@@ -52,7 +52,7 @@ theorem card_literal [Fintype V] : Fintype.card (Literal V) = 2 * Fintype.card V
 
 /-- A *clause set*: a finite set of clauses, each a finite set of literals. A clause is satisfied
 when one of its literals is true; a clause set when all of its clauses are. -/
-abbrev ClauseSet (V : Type*) := Finset (Finset (Literal V))
+abbrev ClauseSet (V : Type*) := Finset (FiniteClause V)
 
 namespace ClauseSet
 
@@ -82,6 +82,11 @@ end ClauseSet
 /-- The clause set of a formula in conjunctive normal form. -/
 def CNF.toClauseSet (φ : CNF V) : ClauseSet V :=
   (φ.map List.toFinset).toFinset
+
+/-- An input finite clause is represented by one of the formula's list clauses. -/
+@[simp] theorem CNF.mem_toClauseSet {φ : CNF V} {C : FiniteClause V} :
+    C ∈ φ.toClauseSet ↔ ∃ c ∈ φ, c.toFinset = C := by
+  simp only [toClauseSet, List.mem_toFinset, List.mem_map]
 
 /-- A formula in conjunctive normal form and its clause set have the same solutions. -/
 theorem CNF.sat_toClauseSet_iff (φ : CNF V) (x : V → Bool) :

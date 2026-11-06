@@ -43,7 +43,9 @@ private theorem two_le_minBalancedCut_triangle : 2 ≤ Multigraph.minBalancedCut
 
 /-- Resolution refutations of the unsatisfiable Tseitin formula on the triangle have width at least
 `2`. -/
-example : ¬ (CNF.tseitinFormula triangle fun v => decide (v = 0)).RefutableInWidth 1 := fun h => by
+example :
+    ¬ (CNF.tseitinFormula triangle fun v => decide (v = 0)).toClauseSet.RefutableInWidth 1 :=
+    fun h => by
   have := Tseitin.minBalancedCut_le_of_refutableInWidth connected_triangle h
   have := two_le_minBalancedCut_triangle
   omega

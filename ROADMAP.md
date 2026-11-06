@@ -426,8 +426,11 @@ DLOGTIME-uniform AC⁰ under explicit conventions.
 
 ### Proof complexity
 
-- Proof-space lower bounds, Frege, cutting planes, polynomial calculus and sum-of-squares, and
-  certified DPLL solver runtimes.
+- **Resolution space:** explicit sequences of live finite-clause configurations, with input,
+  inference and erasure steps, and clause-space/literal-space correspondence theorems. DAG line
+  count and tree-node count do not supply space bounds; proof-space lower bounds remain open.
+- Frege, cutting planes, polynomial calculus and sum-of-squares, and certified DPLL solver
+  runtimes.
 - **Feasible interpolation** ([#1817]): the transfer of communication lower bounds to proof-size
   lower bounds ([#2019]).
 - **Proof search:** automatizability and weak automatizability with explicit encodings and

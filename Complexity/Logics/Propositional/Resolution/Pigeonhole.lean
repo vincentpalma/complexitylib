@@ -30,8 +30,8 @@ Let `P ⊆ Fin m` and `H ⊆ Fin n` be sets of remaining pigeons and holes with 
    (`Cslib.Logic.PL.Pigeonhole.critAssign`) places `g j` in hole `j` for each `j ∈ H` and leaves a
    single pigeon `i₀ ∈ P \ H.image g` outside all holes. Let `falsifiedPigeons P H c` be the set of
    pigeons `i₀ ∈ P` that are left out by some critical assignment falsifying `c`. Each clause of
-   `pigeonholeOn P H` has `#(falsifiedPigeons P H c) ≤ 1`, resolution steps are subadditive, and the
-   empty clause has `falsifiedPigeons P H [] = P`, so every refutation contains a line `c` with
+   `pigeonholeOn P H` has `#(falsifiedPigeons P H c) ≤ 1`, resolution steps are subadditive, and
+   the empty clause has `falsifiedPigeons P H ∅ = P`, so every refutation contains a line `c` with
    `#P ≤ 3 #(falsifiedPigeons P H c) ≤ 2 #P` (for `#H ≥ 1`), giving
    `2 (#H)² ≤ 9 #(falsifiedPigeons P H c) (#P - #(falsifiedPigeons P H c))`.
 
@@ -46,9 +46,9 @@ Let `P ⊆ Fin m` and `H ⊆ Fin n` be sets of remaining pigeons and holes with 
    (`Cslib.Logic.PL.Pigeonhole.exists_le_card_satPairs`).
 
 2. **Eliminating wide lines by matching one pair at a time.** Restricting a proof from
-   `pigeonholeOn P H` by `matchPair i₀ j₀` (`Cslib.Logic.PL.CNF.IsProof.restrictBy`) yields a proof
-   from `pigeonholeOn (P.erase i₀) (H.erase j₀)` whose lines are subclauses of a sublist of the
-   lines not satisfied by `matchPair i₀ j₀`. Since `satPairs` is monotone in `P`, `H`, and the
+   `pigeonholeOn P H` by `matchPair i₀ j₀` (`Cslib.Logic.PL.ClauseSet.IsProof.restrictBy`) yields a
+   proof from `pigeonholeOn (P.erase i₀) (H.erase j₀)` whose lines are subclauses of a sublist of
+   the lines not satisfied by `matchPair i₀ j₀`. Since `satPairs` is monotone in `P`, `H`, and the
    clause, choosing `(i₀, j₀) ∈ P ×ˢ H` by averaging reduces the number `f` of lines with
    `d ≤ #(satPairs P H c)` to `f'` with `C f' ≤ (C - 1) f` whenever `#P · #H ≤ C d`. After
    `t = n / 3` steps from `PHP^{n+1}_n` with `d = 2 (n - n / 3)² / 9` and `C = 12` (for `n ≥ 8`),
@@ -77,8 +77,8 @@ Let `P ⊆ Fin m` and `H ⊆ Fin n` be sets of remaining pigeons and holes with 
 * `Cslib.Logic.PL.CNF.two_pow_le_of_refutableInSize_pigeonhole`,
   `Cslib.Logic.PL.CNF.not_refutableInSize_pigeonhole`: **Haken's theorem**: every resolution
   refutation of `PHP^{n+1}_n` has at least `2 ^ (n / 24)` lines.
-* `Cslib.Logic.PL.CNF.Derivation.two_pow_le_size_pigeonhole`: the same lower bound for tree-like
-  resolution refutations.
+* `Cslib.Logic.PL.ClauseSet.Derivation.two_pow_le_size_pigeonhole`: the same lower bound for
+  tree-like resolution refutations.
 
 ## References
 
@@ -120,7 +120,8 @@ def pigeonholeOn (P : Finset (Fin m)) (H : Finset (Fin n)) : CNF (Fin m × Fin n
     pigeonholeOn (univ : Finset (Fin m)) (univ : Finset (Fin n)) = CNF.pigeonhole m n := by
   simp [pigeonholeOn, CNF.pigeonhole]
 
-/-- The clauses of `pigeonholeOn P H` are its pigeon clauses and its hole clauses on `P` and `H`. -/
+/-- The clauses of `pigeonholeOn P H` are its pigeon clauses and its hole clauses on `P` and
+`H`. -/
 theorem mem_pigeonholeOn {P : Finset (Fin m)} {H : Finset (Fin n)} {c : Clause (Fin m × Fin n)} :
     c ∈ pigeonholeOn P H ↔
       (∃ i ∈ P, c = pigeonClauseOn H i) ∨
@@ -137,6 +138,22 @@ theorem mem_pigeonholeOn {P : Finset (Fin m)} {H : Finset (Fin n)} {c : Clause (
 @[simp] theorem eval_pigeonClauseOn (σ : Fin m × Fin n → Bool) (H : Finset (Fin n)) (i : Fin m) :
     (pigeonClauseOn H i).eval σ = true ↔ ∃ j ∈ H, σ (i, j) = true := by
   simp [pigeonClauseOn, Clause.eval_eq_true_iff]
+
+/-- The mathematical clauses of a restricted pigeonhole input are its finite pigeon and hole
+clauses. Literal order and repeated clauses in the input are forgotten. -/
+theorem mem_toClauseSet_pigeonholeOn {P : Finset (Fin m)} {H : Finset (Fin n)}
+    {c : FiniteClause (Fin m × Fin n)} :
+    c ∈ (pigeonholeOn P H).toClauseSet ↔
+      (∃ i ∈ P, (pigeonClauseOn H i).toFinset = c) ∨
+        ∃ i ∈ P, ∃ i' ∈ P, ∃ j ∈ H, i < i' ∧ (CNF.holeClause i i' j).toFinset = c := by
+  rw [CNF.mem_toClauseSet]
+  constructor
+  · rintro ⟨d, hd, rfl⟩
+    rcases mem_pigeonholeOn.1 hd with ⟨i, hi, rfl⟩ | ⟨i, hi, i', hi', j, hj, hii', rfl⟩
+    exacts [Or.inl ⟨i, hi, rfl⟩, Or.inr ⟨i, hi, i', hi', j, hj, hii', rfl⟩]
+  · rintro (⟨i, hi, rfl⟩ | ⟨i, hi, i', hi', j, hj, hii', rfl⟩)
+    · exact ⟨_, mem_pigeonholeOn.2 (Or.inl ⟨i, hi, rfl⟩), rfl⟩
+    · exact ⟨_, mem_pigeonholeOn.2 (Or.inr ⟨i, hi, i', hi', j, hj, hii', rfl⟩), rfl⟩
 
 /-! ### Matching a pigeon to a hole -/
 
@@ -174,19 +191,19 @@ private theorem matchPair_of_fst_ne_of_snd_eq {i i' : Fin m} {j : Fin n} (hi : i
 `pigeonholeOn (P.erase i₀) (H.erase j₀)`. -/
 private theorem restrictBy_pigeonholeOn_subset {P : Finset (Fin m)} {H : Finset (Fin n)}
     {i₀ : Fin m} {j₀ : Fin n} (hj₀ : j₀ ∈ H) :
-    (pigeonholeOn P H).restrictBy (matchPair i₀ j₀) ⊆ pigeonholeOn (P.erase i₀) (H.erase j₀) := by
+    (pigeonholeOn P H).toClauseSet.restrictBy (matchPair i₀ j₀) ⊆
+      (pigeonholeOn (P.erase i₀) (H.erase j₀)).toClauseSet := by
   intro c hc
-  obtain ⟨d, hd, hsat, rfl⟩ := CNF.mem_restrictBy.1 hc
-  rcases mem_pigeonholeOn.1 hd with ⟨i, hi, rfl⟩ | ⟨i, hi, i', hi', j, hj, hii', rfl⟩
+  obtain ⟨d, hd, hsat, rfl⟩ := ClauseSet.mem_restrictBy.1 hc
+  rcases mem_toClauseSet_pigeonholeOn.1 hd with ⟨i, hi, rfl⟩ | ⟨i, hi, i', hi', j, hj, hii', rfl⟩
   · have hii₀ : i ≠ i₀ := by
       rintro rfl
       refine hsat ((i, j₀), true) ?_ (matchPair_self i j₀)
       simp [pigeonClauseOn, hj₀]
-    refine mem_pigeonholeOn.2 (Or.inl ⟨i, mem_erase.2 ⟨hii₀, hi⟩, ?_⟩)
-    simp only [pigeonClauseOn, List.filter_map, List.filter_filter]
-    congr 1
-    refine List.filter_congr fun j _ => ?_
-    simp [matchPair_eq_none, hii₀, mem_erase]
+    refine mem_toClauseSet_pigeonholeOn.2 (Or.inl ⟨i, mem_erase.2 ⟨hii₀, hi⟩, ?_⟩)
+    ext ⟨⟨i', j⟩, b⟩
+    simp [pigeonClauseOn, matchPair_eq_none, mem_erase]
+    grind
   · have hne : i ≠ i' := hii'.ne
     have hii₀ : i ≠ i₀ := by
       rintro rfl
@@ -201,9 +218,14 @@ private theorem restrictBy_pigeonholeOn_subset {P : Finset (Fin m)} {H : Finset 
     have hi'i₀ : i' ≠ i₀ := by
       rintro rfl
       exact hsat ((i', j), false) (by simp [CNF.holeClause]) (matchPair_of_fst_eq_of_snd_ne hjj₀)
-    refine mem_pigeonholeOn.2 (Or.inr ⟨i, mem_erase.2 ⟨hii₀, hi⟩, i', mem_erase.2 ⟨hi'i₀, hi'⟩,
-      j, mem_erase.2 ⟨hjj₀, hj⟩, hii', ?_⟩)
-    simp [CNF.holeClause, matchPair_eq_none, hii₀, hi'i₀, hjj₀]
+    refine mem_toClauseSet_pigeonholeOn.2 (Or.inr ⟨i, mem_erase.2 ⟨hii₀, hi⟩, i',
+      mem_erase.2 ⟨hi'i₀, hi'⟩, j, mem_erase.2 ⟨hjj₀, hj⟩, hii', ?_⟩)
+    symm
+    refine Finset.filter_eq_self.2 fun l hl => ?_
+    rcases List.mem_cons.1 (List.mem_toFinset.1 hl) with rfl | hl
+    · exact matchPair_eq_none.2 ⟨hii₀, hjj₀⟩
+    · obtain rfl := List.mem_singleton.1 hl
+      exact matchPair_eq_none.2 ⟨hi'i₀, hjj₀⟩
 
 /-! ### Critical assignments and the monotone width bound -/
 
@@ -326,12 +348,12 @@ private theorem matchPair_eq_some_of_critAssign_ne {H : Finset (Fin n)} {g : Fin
 
 /-- The pairs `(i, j) ∈ P ×ˢ H` whose matching assignment `matchPair i j` satisfies a literal of
 `c`. This is the monotone translation of `c` (together with row-negation pairs). -/
-def satPairs (P : Finset (Fin m)) (H : Finset (Fin n)) (c : Clause (Fin m × Fin n)) :
+def satPairs (P : Finset (Fin m)) (H : Finset (Fin n)) (c : FiniteClause (Fin m × Fin n)) :
     Finset (Fin m × Fin n) :=
   (P ×ˢ H).filter fun p => ∃ l ∈ c, matchPair p.1 p.2 l.1 = some l.2
 
 private theorem satPairs_subset {P' P : Finset (Fin m)} {H' H : Finset (Fin n)}
-    {c' c : Clause (Fin m × Fin n)} (hP : P' ⊆ P) (hH : H' ⊆ H) (hc : ∀ l ∈ c', l ∈ c) :
+    {c' c : FiniteClause (Fin m × Fin n)} (hP : P' ⊆ P) (hH : H' ⊆ H) (hc : ∀ l ∈ c', l ∈ c) :
     satPairs P' H' c' ⊆ satPairs P H c := by
   intro p hp
   obtain ⟨hpPH, l, hl, hmatch⟩ := mem_filter.1 hp
@@ -339,14 +361,14 @@ private theorem satPairs_subset {P' P : Finset (Fin m)} {H' H : Finset (Fin n)}
 
 /-- The pigeons of `P` that can be the missing pigeon of a critical assignment falsifying `c`. -/
 noncomputable def falsifiedPigeons (P : Finset (Fin m)) (H : Finset (Fin n))
-    (c : Clause (Fin m × Fin n)) : Finset (Fin m) :=
+    (c : FiniteClause (Fin m × Fin n)) : Finset (Fin m) :=
   open Classical in
   P.filter fun i => ∃ g, IsCrit P H g ∧ i ∉ H.image g ∧ c.eval (critAssign H g) = false
 
 /-- A pigeon `i` belongs to `falsifiedPigeons P H c` iff `i ∈ P` and `i` is the missing pigeon of
 some critical assignment falsifying `c`. -/
 theorem mem_falsifiedPigeons {P : Finset (Fin m)} {H : Finset (Fin n)}
-    {c : Clause (Fin m × Fin n)} {i : Fin m} :
+    {c : FiniteClause (Fin m × Fin n)} {i : Fin m} :
     i ∈ falsifiedPigeons P H c ↔
       i ∈ P ∧ ∃ g, IsCrit P H g ∧ i ∉ H.image g ∧ c.eval (critAssign H g) = false := by
   classical
@@ -354,29 +376,30 @@ theorem mem_falsifiedPigeons {P : Finset (Fin m)} {H : Finset (Fin n)}
 
 /-- `falsifiedPigeons P H c` is a subset of `P`. -/
 theorem falsifiedPigeons_subset (P : Finset (Fin m)) (H : Finset (Fin n))
-    (c : Clause (Fin m × Fin n)) : falsifiedPigeons P H c ⊆ P := by
+    (c : FiniteClause (Fin m × Fin n)) : falsifiedPigeons P H c ⊆ P := by
   intro i hi
   exact (mem_falsifiedPigeons.1 hi).1
 
 /-- A clause of `pigeonholeOn P H` has at most one falsified pigeon when `#P = #H + 1`. -/
 private theorem card_falsifiedPigeons_le_one_of_mem_pigeonholeOn {P : Finset (Fin m)}
-    {H : Finset (Fin n)} (hP : #P = #H + 1) {c : Clause (Fin m × Fin n)}
-    (hc : c ∈ pigeonholeOn P H) : #(falsifiedPigeons P H c) ≤ 1 := by
-  rcases mem_pigeonholeOn.1 hc with ⟨i₀, hi₀, rfl⟩ | ⟨i, _, i', _, j, _, hii', rfl⟩
+    {H : Finset (Fin n)} (hP : #P = #H + 1) {c : FiniteClause (Fin m × Fin n)}
+    (hc : c ∈ (pigeonholeOn P H).toClauseSet) : #(falsifiedPigeons P H c) ≤ 1 := by
+  rcases mem_toClauseSet_pigeonholeOn.1 hc with ⟨i₀, hi₀, rfl⟩ | ⟨i, _, i', _, j, _, hii', rfl⟩
   · refine card_le_one.2 fun i₁ hi₁ i₂ hi₂ => ?_
     obtain ⟨hi₁P, g₁, hg₁, h₁, hc₁⟩ := mem_falsifiedPigeons.1 hi₁
     obtain ⟨hi₂P, g₂, hg₂, h₂, hc₂⟩ := mem_falsifiedPigeons.1 hi₂
-    rw [Bool.eq_false_iff, ne_eq, eval_pigeonClauseOn_critAssign] at hc₁ hc₂
+    rw [FiniteClause.eval_toFinset, Bool.eq_false_iff, ne_eq,
+      eval_pigeonClauseOn_critAssign] at hc₁ hc₂
     exact (eq_of_not_mem_image_of_isCrit hP hg₁ hi₁P hi₀ h₁ hc₁).trans
       (eq_of_not_mem_image_of_isCrit hP hg₂ hi₀ hi₂P hc₂ h₂)
   · refine card_le_one.2 fun i₁ hi₁ => ?_
     obtain ⟨-, g, -, -, hc₁⟩ := mem_falsifiedPigeons.1 hi₁
-    rw [eval_holeClause_critAssign H g hii'.ne j] at hc₁
+    rw [FiniteClause.eval_toFinset, eval_holeClause_critAssign H g hii'.ne j] at hc₁
     cases hc₁
 
 /-- `falsifiedPigeons` is subadditive across resolution steps. -/
 private theorem card_falsifiedPigeons_resolvent_le (P : Finset (Fin m)) (H : Finset (Fin n))
-    (c₁ c₂ : Clause (Fin m × Fin n)) (v : Fin m × Fin n) :
+    (c₁ c₂ : FiniteClause (Fin m × Fin n)) (v : Fin m × Fin n) :
     #(falsifiedPigeons P H (c₁.resolvent c₂ v)) ≤
       #(falsifiedPigeons P H c₁) + #(falsifiedPigeons P H c₂) := by
   classical
@@ -386,13 +409,14 @@ private theorem card_falsifiedPigeons_resolvent_le (P : Finset (Fin m)) (H : Fin
   · exact mem_union_left _ (mem_falsifiedPigeons.2 ⟨hiP, g, hg, h₀, hc₁⟩)
   · have hc₂ : c₂.eval (critAssign H g) = false := by
       by_contra hc₂
-      exact Bool.false_ne_true (hc.symm.trans (Clause.eval_resolvent v
+      exact Bool.false_ne_true (hc.symm.trans (FiniteClause.eval_resolvent v
         (Bool.not_eq_false _ ▸ hc₁) (Bool.not_eq_false _ ▸ hc₂)))
     exact mem_union_right _ (mem_falsifiedPigeons.2 ⟨hiP, g, hg, h₀, hc₂⟩)
 
 /-- Every pigeon of `P` is a falsified pigeon of the empty clause when `#P = #H + 1`. -/
-private theorem falsifiedPigeons_nil {P : Finset (Fin m)} {H : Finset (Fin n)} (hP : #P = #H + 1) :
-    falsifiedPigeons P H [] = P := by
+private theorem falsifiedPigeons_empty {P : Finset (Fin m)} {H : Finset (Fin n)}
+    (hP : #P = #H + 1) :
+    falsifiedPigeons P H ∅ = P := by
   ext i
   rw [mem_falsifiedPigeons]
   refine ⟨fun h => h.1, fun hi => ⟨hi, ?_⟩⟩
@@ -402,8 +426,8 @@ private theorem falsifiedPigeons_nil {P : Finset (Fin m)} {H : Finset (Fin n)} (
 /-- Along a proof from `pigeonholeOn P H` with `#P = #H + 1` and `#H ≥ 1`, either every line has
 `3 #(falsifiedPigeons P H c) < #P`, or some line has `#P ≤ 3 #(falsifiedPigeons P H c) ≤ 2 #P`. -/
 private theorem forall_or_exists_card_falsifiedPigeons {P : Finset (Fin m)} {H : Finset (Fin n)}
-    (hP : #P = #H + 1) (hH : 1 ≤ #H) {ls : List (Clause (Fin m × Fin n))}
-    (h : (pigeonholeOn P H).IsProof ls) :
+    (hP : #P = #H + 1) (hH : 1 ≤ #H) {ls : List (FiniteClause (Fin m × Fin n))}
+    (h : (pigeonholeOn P H).toClauseSet.IsProof ls) :
     (∀ c ∈ ls, 3 * #(falsifiedPigeons P H c) < #P) ∨
       ∃ c ∈ ls, #P ≤ 3 * #(falsifiedPigeons P H c) ∧ 3 * #(falsifiedPigeons P H c) ≤ 2 * #P := by
   induction h with
@@ -428,15 +452,15 @@ private theorem forall_or_exists_card_falsifiedPigeons {P : Finset (Fin m)} {H :
 /-- Every refutation of `pigeonholeOn P H` (with `#P = #H + 1`) contains a line `c` with
 `2 (#H)² ≤ 9 #(falsifiedPigeons P H c) (#P - #(falsifiedPigeons P H c))`. -/
 private theorem exists_le_card_falsifiedPigeons_mul {P : Finset (Fin m)} {H : Finset (Fin n)}
-    (hP : #P = #H + 1) {ls : List (Clause (Fin m × Fin n))} (h : (pigeonholeOn P H).IsProof ls)
-    (hnil : [] ∈ ls) :
+    (hP : #P = #H + 1) {ls : List (FiniteClause (Fin m × Fin n))}
+    (h : (pigeonholeOn P H).toClauseSet.IsProof ls) (hnil : ∅ ∈ ls) :
     ∃ c ∈ ls, 2 * (#H) ^ 2 ≤
       9 * #(falsifiedPigeons P H c) * (#P - #(falsifiedPigeons P H c)) := by
   rcases Nat.eq_zero_or_pos #H with hH0 | hH
-  · exact ⟨[], hnil, by simp [hH0]⟩
+  · exact ⟨∅, hnil, by simp [hH0]⟩
   rcases forall_or_exists_card_falsifiedPigeons hP hH h with hall | ⟨c, hc, h₁, h₂⟩
-  · have h' := hall [] hnil
-    rw [falsifiedPigeons_nil hP] at h'
+  · have h' := hall ∅ hnil
+    rw [falsifiedPigeons_empty hP] at h'
     omega
   · refine ⟨c, hc, ?_⟩
     set s := #(falsifiedPigeons P H c)
@@ -448,7 +472,7 @@ private theorem exists_le_card_falsifiedPigeons_mul {P : Finset (Fin m)} {H : Fi
 /-- For each `i₀ ∈ falsifiedPigeons P H c`, at least `#P - #(falsifiedPigeons P H c)` holes `j ∈ H`
 have `(i₀, j) ∈ satPairs P H c`. -/
 private theorem sub_le_card_filter_satPairs {P : Finset (Fin m)} {H : Finset (Fin n)}
-    (hP : #P = #H + 1) {c : Clause (Fin m × Fin n)} {i₀ : Fin m}
+    (hP : #P = #H + 1) {c : FiniteClause (Fin m × Fin n)} {i₀ : Fin m}
     (hi₀ : i₀ ∈ falsifiedPigeons P H c) :
     #P - #(falsifiedPigeons P H c) ≤ #((satPairs P H c).filter fun p => p.1 = i₀) := by
   set S := falsifiedPigeons P H c
@@ -465,9 +489,10 @@ private theorem sub_le_card_filter_satPairs {P : Finset (Fin m)} {H : Finset (Fi
       by_contra hc₁
       exact hi₁S (mem_falsifiedPigeons.2 ⟨hg.1 j hj, _, isCrit_update hg hi₀P h₀,
         not_mem_image_update hg h₀ hj, Bool.eq_false_iff.2 hc₁⟩)
-    obtain ⟨l, hl, hl₁⟩ := (Clause.eval_eq_true_iff _ _).1 hc₁
+    obtain ⟨l, hl, hl₁⟩ := (FiniteClause.eval_eq_true_iff _ _).1 hc₁
     have hne' : critAssign H g l.1 ≠ critAssign H (Function.update g j i₀) l.1 := fun h =>
-      Bool.false_ne_true (hc₀.symm.trans ((Clause.eval_eq_true_iff _ _).2 ⟨l, hl, h.trans hl₁⟩))
+      Bool.false_ne_true
+        (hc₀.symm.trans ((FiniteClause.eval_eq_true_iff _ _).2 ⟨l, hl, h.trans hl₁⟩))
     exact mem_filter.2 ⟨mem_product.2 ⟨hi₀P, hj⟩, l, hl,
       hl₁ ▸ matchPair_eq_some_of_critAssign_ne hj hne'⟩
   have hSP : S ⊆ P := falsifiedPigeons_subset P H c
@@ -481,8 +506,9 @@ private theorem sub_le_card_filter_satPairs {P : Finset (Fin m)} {H : Finset (Fi
 
 /-- **Relating falsified pigeons and monotone pairs** [Beame and Pitassi][BeamePitassi1996]:
 `#(falsifiedPigeons P H c) (#P - #(falsifiedPigeons P H c)) ≤ #(satPairs P H c)`. -/
-private theorem card_falsifiedPigeons_mul_le_card_satPairs {P : Finset (Fin m)} {H : Finset (Fin n)}
-    (hP : #P = #H + 1) (c : Clause (Fin m × Fin n)) :
+private theorem card_falsifiedPigeons_mul_le_card_satPairs {P : Finset (Fin m)}
+    {H : Finset (Fin n)}
+    (hP : #P = #H + 1) (c : FiniteClause (Fin m × Fin n)) :
     #(falsifiedPigeons P H c) * (#P - #(falsifiedPigeons P H c)) ≤ #(satPairs P H c) := by
   set S := falsifiedPigeons P H c
   calc #S * (#P - #S) = ∑ _i₀ ∈ S, (#P - #S) := by simp
@@ -500,7 +526,8 @@ private theorem card_falsifiedPigeons_mul_le_card_satPairs {P : Finset (Fin m)} 
 `#P = #H + 1`, every resolution refutation of `pigeonholeOn P H` contains a line `c` with
 `2 (#H)² ≤ 9 #(satPairs P H c)`. -/
 theorem exists_le_card_satPairs {P : Finset (Fin m)} {H : Finset (Fin n)} (hP : #P = #H + 1)
-    {ls : List (Clause (Fin m × Fin n))} (h : (pigeonholeOn P H).IsProof ls) (hnil : [] ∈ ls) :
+    {ls : List (FiniteClause (Fin m × Fin n))}
+    (h : (pigeonholeOn P H).toClauseSet.IsProof ls) (hnil : ∅ ∈ ls) :
     ∃ c ∈ ls, 2 * (#H) ^ 2 ≤ 9 * #(satPairs P H c) := by
   obtain ⟨c, hc, hle⟩ := exists_le_card_falsifiedPigeons_mul hP h hnil
   have hmul := card_falsifiedPigeons_mul_le_card_satPairs hP c
@@ -523,8 +550,9 @@ private theorem sum_countP_mem_eq_sum_card {α β : Type*} [DecidableEq α] (U :
     simp only [decide_eq_true_eq, mem_filter, and_iff_right_iff_imp]
     exact fun hx => hF c List.mem_cons_self hx
 
-private theorem exists_le_countP_mem {α β : Type*} [DecidableEq α] (U : Finset α) (S : β → Finset α)
-    (d : ℕ) (F : List β) (hU : U.Nonempty) (hF : ∀ c ∈ F, S c ⊆ U) (hwide : ∀ c ∈ F, d ≤ #(S c)) :
+private theorem exists_le_countP_mem {α β : Type*} [DecidableEq α] (U : Finset α)
+    (S : β → Finset α) (d : ℕ) (F : List β) (hU : U.Nonempty) (hF : ∀ c ∈ F, S c ⊆ U)
+    (hwide : ∀ c ∈ F, d ≤ #(S c)) :
     ∃ x ∈ U, d * F.length ≤ F.countP (fun c => x ∈ S c) * #U := by
   refine exists_le_of_sum_le hU ?_
   rw [sum_const, nsmul_eq_mul, ← sum_mul, sum_countP_mem_eq_sum_card U S F hF]
@@ -552,9 +580,10 @@ private theorem countP_le_of_forall₂ {α β : Type*} {R : α → β → Prop} 
 `d ≤ #(satPairs (P.erase i₀) (H.erase j₀) c)` satisfies `C f' ≤ (C - 1) f`. -/
 private theorem exists_restrict_countP_satPairs {P : Finset (Fin m)} {H : Finset (Fin n)} {C d : ℕ}
     (hP : P.Nonempty) (hH : H.Nonempty) (hd : 0 < d) (hC : #P * #H ≤ C * d)
-    {ls : List (Clause (Fin m × Fin n))} (h : (pigeonholeOn P H).IsProof ls) (hnil : [] ∈ ls) :
+    {ls : List (FiniteClause (Fin m × Fin n))}
+    (h : (pigeonholeOn P H).toClauseSet.IsProof ls) (hnil : ∅ ∈ ls) :
     ∃ i₀ ∈ P, ∃ j₀ ∈ H, ∃ ls',
-      (pigeonholeOn (P.erase i₀) (H.erase j₀)).IsProof ls' ∧ [] ∈ ls' ∧
+      (pigeonholeOn (P.erase i₀) (H.erase j₀)).toClauseSet.IsProof ls' ∧ ∅ ∈ ls' ∧
         C * ls'.countP (fun c => d ≤ #(satPairs (P.erase i₀) (H.erase j₀) c)) ≤
           (C - 1) * ls.countP (fun c => d ≤ #(satPairs P H c)) := by
   set F := ls.filter (fun c => d ≤ #(satPairs P H c))
@@ -566,8 +595,9 @@ private theorem exists_restrict_countP_satPairs {P : Finset (Fin m)} {H : Finset
   obtain ⟨hi₀, hj₀⟩ := mem_product.1 hpU
   rw [card_product, hFlen] at hmany
   obtain ⟨ls', h', hsub, ks, hks, hfree, hF⟩ := h.restrictBy (matchPair i₀ j₀)
-  obtain ⟨c₀, hc₀, hsub₀⟩ := hsub [] hnil (by simp)
-  have hc₀' : c₀ = [] := List.eq_nil_iff_forall_not_mem.2 fun l hl => List.not_mem_nil (hsub₀ l hl)
+  obtain ⟨c₀, hc₀, hsub₀⟩ := hsub ∅ hnil (by simp)
+  have hc₀' : c₀ = ∅ := Finset.eq_empty_iff_forall_notMem.2 fun l hl =>
+    Finset.notMem_empty _ (hsub₀ l hl)
   refine ⟨i₀, hi₀, j₀, hj₀, ls', h'.mono (restrictBy_pigeonholeOn_subset hj₀), hc₀' ▸ hc₀, ?_⟩
   -- lines of `ls'` are subclauses of lines of `ks`, which are not satisfied by `matchPair i₀ j₀`
   have hle₁ : ls'.countP (fun c => d ≤ #(satPairs (P.erase i₀) (H.erase j₀) c)) ≤
@@ -611,9 +641,9 @@ private theorem exists_restrict_countP_satPairs {P : Finset (Fin m)} {H : Finset
 `0 < d`, and `9 d ≤ 2 (#H - t)²`, then every refutation `ls` of `pigeonholeOn P H` satisfies
 `C ^ t ≤ (C - 1) ^ t · ls.countP (fun c => d ≤ #(satPairs P H c))`. -/
 private theorem pow_le_mul_countP_satPairs {C d : ℕ} (hd : 0 < d) :
-    ∀ (t : ℕ) {P : Finset (Fin m)} {H : Finset (Fin n)} {ls : List (Clause (Fin m × Fin n))},
+    ∀ (t : ℕ) {P : Finset (Fin m)} {H : Finset (Fin n)} {ls : List (FiniteClause (Fin m × Fin n))},
       #P = #H + 1 → t ≤ #H → #P * #H ≤ C * d → 9 * d ≤ 2 * (#H - t) ^ 2 →
-      (pigeonholeOn P H).IsProof ls → [] ∈ ls →
+      (pigeonholeOn P H).toClauseSet.IsProof ls → ∅ ∈ ls →
       C ^ t ≤ (C - 1) ^ t * ls.countP (fun c => d ≤ #(satPairs P H c))
   | 0, P, H, ls, hP, _, _, hdH, h, hnil => by
     obtain ⟨c, hc, hwide⟩ := exists_le_card_satPairs hP h hnil
@@ -659,8 +689,8 @@ variable {n : ℕ}
 
 /-- Every resolution refutation of `PHP^{n+1}_n` contains a line whose monotone translation has at
 least `2 n² / 9` variable pairs [Beame and Pitassi, Lemma 4][BeamePitassi1996]. -/
-theorem exists_le_card_satPairs_pigeonhole {ls : List (Clause (Fin (n + 1) × Fin n))}
-    (h : (pigeonhole (n + 1) n).IsProof ls) (hnil : [] ∈ ls) :
+theorem exists_le_card_satPairs_pigeonhole {ls : List (FiniteClause (Fin (n + 1) × Fin n))}
+    (h : (pigeonhole (n + 1) n).toClauseSet.IsProof ls) (hnil : ∅ ∈ ls) :
     ∃ c ∈ ls, 2 * n ^ 2 ≤ 9 * #(Pigeonhole.satPairs univ univ c) := by
   rw [← Pigeonhole.pigeonholeOn_univ] at h
   simpa using Pigeonhole.exists_le_card_satPairs (by simp) h hnil
@@ -681,7 +711,7 @@ private theorem mul_le_twelve_mul_div (hn : 8 ≤ n) :
 every resolution refutation of `PHP^{n+1}_n` of `s` lines satisfies
 `12 ^ (n / 3) ≤ 11 ^ (n / 3) · s`. -/
 theorem pow_le_mul_of_refutableInSize_pigeonhole (hn : 8 ≤ n) {s : ℕ}
-    (hs : (pigeonhole (n + 1) n).RefutableInSize s) :
+    (hs : (pigeonhole (n + 1) n).toClauseSet.RefutableInSize s) :
     12 ^ (n / 3) ≤ 11 ^ (n / 3) * s := by
   obtain ⟨ls, h, hnil, hlen⟩ := hs
   rw [← Pigeonhole.pigeonholeOn_univ] at h
@@ -696,9 +726,10 @@ theorem pow_le_mul_of_refutableInSize_pigeonhole (hn : 8 ≤ n) {s : ℕ}
   exact hpow.trans (Nat.mul_le_mul_left _ (List.countP_le_length.trans hlen))
 
 /-- **Haken's theorem**: every resolution refutation of `PHP^{n+1}_n` has at least `2 ^ (n / 24)`
-lines [Haken][Haken1985] [Beame and Pitassi][BeamePitassi1996] [Jukna, Theorem 18.15][Jukna2012]. -/
+lines [Haken][Haken1985] [Beame and Pitassi][BeamePitassi1996]
+[Jukna, Theorem 18.15][Jukna2012]. -/
 theorem two_pow_le_of_refutableInSize_pigeonhole {s : ℕ}
-    (hs : (pigeonhole (n + 1) n).RefutableInSize s) :
+    (hs : (pigeonhole (n + 1) n).toClauseSet.RefutableInSize s) :
     2 ^ (n / 24) ≤ s := by
   rcases lt_or_ge n 24 with hn | hn
   · have hdiv : n / 24 = 0 := Nat.div_eq_of_lt hn
@@ -728,14 +759,15 @@ theorem two_pow_le_of_refutableInSize_pigeonhole {s : ℕ}
 /-- **Haken's theorem**: `PHP^{n+1}_n` has no resolution refutation with fewer than `2 ^ (n / 24)`
 lines [Haken][Haken1985] [Beame and Pitassi][BeamePitassi1996]. -/
 theorem not_refutableInSize_pigeonhole {s : ℕ} (hs : s < 2 ^ (n / 24)) :
-    ¬ (pigeonhole (n + 1) n).RefutableInSize s :=
+    ¬ (pigeonhole (n + 1) n).toClauseSet.RefutableInSize s :=
   fun h => hs.not_ge (two_pow_le_of_refutableInSize_pigeonhole h)
 
 /-- **Tree-like resolution lower bound for `PHP^{n+1}_n`**: every tree-like resolution refutation
 of `PHP^{n+1}_n` has at least `2 ^ (n / 24)` nodes. -/
-theorem Derivation.two_pow_le_size_pigeonhole (d : (pigeonhole (n + 1) n).Derivation []) :
+theorem _root_.Cslib.Logic.PL.ClauseSet.Derivation.two_pow_le_size_pigeonhole
+    (d : (pigeonhole (n + 1) n).toClauseSet.Derivation ∅) :
     2 ^ (n / 24) ≤ d.size :=
-  two_pow_le_of_refutableInSize_pigeonhole d.refutableInSize
+  CNF.two_pow_le_of_refutableInSize_pigeonhole d.refutableInSize
 
 end CNF
 

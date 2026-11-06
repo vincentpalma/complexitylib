@@ -208,8 +208,10 @@ The [module census script](data/census.py) can enumerate every tracked Lean sour
 | `csp` | [Relation-alphabet constraint satisfaction problems](circuits-logic-and-other-models/index.md) | propositional-models |
 | `qbf` | [Named-variable quantified Boolean formulas](circuits-logic-and-other-models/index.md) | propositional-models |
 | `resolution-relation` | [Inductive resolution derivability](circuits-logic-and-other-models/index.md) | proof-systems |
-| `resolution-lines` | [Resolution proofs as ordered line lists](circuits-logic-and-other-models/index.md) | proof-systems |
+| `resolution-lines` | [Resolution proofs as ordered finite-clause lines](circuits-logic-and-other-models/index.md) | proof-systems |
 | `resolution-tree` | [Tree-like resolution derivations](circuits-logic-and-other-models/index.md) | proof-systems |
+| `resolution-dag` | [Finite-clause DAGs with explicit premises and pivots](circuits-logic-and-other-models/proof-systems.md) | proof-systems |
+| `resolution-certificates` | [Encoded clauses and verified annotations](circuits-logic-and-other-models/proof-systems.md) | proof-systems |
 | `pac` | [General deterministic PAC framework](circuits-logic-and-other-models/index.md) | learning |
 | `randomized-pac` | [Randomized agnostic PAC framework](circuits-logic-and-other-models/index.md) | learning |
 | `uniform-learning` | [Uniform-distribution Boolean sample learning](circuits-logic-and-other-models/index.md) | learning |

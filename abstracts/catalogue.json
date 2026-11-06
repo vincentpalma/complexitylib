@@ -240,7 +240,7 @@
         "ComplexityTests.Abstracts.ResolutionAbstract.haken"
       ],
       "summary": "The pigeonhole principle has short CNF statements but requires exponentially many resolution lines.",
-      "scope": "The non-onto pigeonhole formula and a line-based resolution rule, with bound 2^(floor(n/24)); proof size is not solver runtime.",
+      "scope": "The non-onto pigeonhole formula interpreted as finite sets of literals, with finite-set Resolution and bound 2^(floor(n/24)) on proof lines; proof size is not solver runtime.",
       "supporting_theorems": [
         "ComplexityTests.Abstracts.ResolutionAbstract.pigeonhole_satisfiable"
       ],

@@ -4116,6 +4116,7 @@ public import Complexity.Logics.FirstOrder.Reduction.QuantifierFree
 public import Complexity.Logics.FirstOrder.Subformula
 public import Complexity.Logics.FirstOrder.Tuple
 public import Complexity.Logics.Propositional.CNF
+public import Complexity.Logics.Propositional.CNF.ClauseSetPolyTime
 public import Complexity.Logics.Propositional.CNF.Coding
 public import Complexity.Logics.Propositional.CNF.Compact
 public import Complexity.Logics.Propositional.CNF.Compact.ModelCount
@@ -4149,6 +4150,7 @@ public import Complexity.Logics.Propositional.CNF.Planar.PairedCrossover
 public import Complexity.Logics.Propositional.CNF.Planar.PairedWire
 public import Complexity.Logics.Propositional.CNF.PolyTime
 public import Complexity.Logics.Propositional.CNF.PolynomialTests
+public import Complexity.Logics.Propositional.CNF.Restriction
 public import Complexity.Logics.Propositional.CNF.SparseDesignCounter
 public import Complexity.Logics.Propositional.CNF.SparseParityCounter
 public import Complexity.Logics.Propositional.CNF.ThreeCNF
@@ -4196,13 +4198,17 @@ public import Complexity.Logics.Propositional.ClauseSet.Sparsification.Tree
 public import Complexity.Logics.Propositional.ClauseSet.SubcubeFree
 public import Complexity.Logics.Propositional.CliqueColoring
 public import Complexity.Logics.Propositional.DNF
+public import Complexity.Logics.Propositional.FiniteClause
 public import Complexity.Logics.Propositional.Parity
 public import Complexity.Logics.Propositional.Parity.DepthThree
 public import Complexity.Logics.Propositional.Pigeonhole
 public import Complexity.Logics.Propositional.QBF
 public import Complexity.Logics.Propositional.QBF.Arithmetization
 public import Complexity.Logics.Propositional.Resolution
+public import Complexity.Logics.Propositional.Resolution.Certificate
+public import Complexity.Logics.Propositional.Resolution.Certificate.PolyTime
 public import Complexity.Logics.Propositional.Resolution.CliqueColoring
+public import Complexity.Logics.Propositional.Resolution.DAG
 public import Complexity.Logics.Propositional.Resolution.Interpolation
 public import Complexity.Logics.Propositional.Resolution.Interpolation.Extraction
 public import Complexity.Logics.Propositional.Resolution.Interpolation.MonotoneExtraction

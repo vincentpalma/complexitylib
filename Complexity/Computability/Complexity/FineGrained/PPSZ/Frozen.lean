@@ -9,7 +9,7 @@ module
 
 public import Complexity.Computability.Complexity.FineGrained.PPSZ.AssignSL
 public import Complexity.Computability.Complexity.FineGrained.PPSZ.Unique
-public import Complexity.Logics.Propositional.Resolution.Restrict
+public import Complexity.Logics.Propositional.CNF.Restriction
 
 /-!
 # PPSZ for satisfiable formulas: frozen variables and the guess probability
@@ -63,7 +63,7 @@ The restriction of a formula by a partial assignment is `Cslib.Logic.PL.CNF.rest
 assignment that extends the partial assignment, it has the value of the formula
 (`Cslib.Logic.PL.CNF.eval_restrictBy`), and it has no wider clauses
 (`Cslib.Logic.PL.CNF.length_le_of_mem_restrictBy`); these facts are in
-`Complexity.Logics.Propositional.Resolution.Restrict`.
+`Complexity.Logics.Propositional.CNF.Restriction`.
 
 ## Main definitions
 

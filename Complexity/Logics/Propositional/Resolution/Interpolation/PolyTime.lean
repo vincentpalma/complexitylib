@@ -22,6 +22,8 @@ import Complexity.Computability.Machines.Turing.MultiTape.Complexity.PolyTime.Su
 import Complexity.Computability.Machines.Turing.MultiTape.Internal.PolyTimeListMap
 import Complexity.Computability.Machines.Turing.MultiTape.Internal.PolyTimeOptionPrimitives
 import Complexity.Logics.Propositional.CNF.PolyTime
+import Complexity.Logics.Propositional.CNF.ClauseSetPolyTime
+import Complexity.Logics.Propositional.Resolution.Certificate.PolyTime
 
 /-!
 # Extracting interpolants in polynomial time
@@ -33,19 +35,24 @@ inputs of the circuit in unary, as in `Cslib.Circuits.Boolean.encCircuit`, then 
 and the lines; a variable is a shared variable in binary or a private variable in any encoding with
 decidable equality, and clauses and formulas are encoded as lists, as in
 `Complexity.Logics.Propositional.CNF.PolyTime`. Its output is the code of the circuit in the
-binary encoding `Cslib.Circuits.Boolean.encCode`.
+binary encoding `Cslib.Circuits.Boolean.encCode`. Axiom and resolvent searches compare the
+represented finite clauses. The polynomial-time comparison is realized by the shared
+`Clause.sameLiterals` algorithm, including permutations and repeated literals in the certificate.
 
-Together with `Cslib.Logic.PL.CNF.IsProof.ofCode_interpolantCode`, this is the effective form of
+Together with `Cslib.Logic.PL.ClauseSet.IsProof.ofCode_interpolantCode`, this is the effective form
+of
 feasible interpolation [Krajíček, Theorem 6.1][Krajicek1997], [Pudlák, Theorem 1][Pudlak1997]:
 the interpolant circuit of a refutation is computed from its lines in polynomial time. The bound is
-not explicit; each line is justified by scanning all pairs of earlier lines and all literals of the
-first, so the running time is polynomial in the number of lines and their widths.
+not explicit; each line is justified by scanning all pairs of earlier lines and all literal
+occurrences of the first. Time is polynomial in the complete encoded input length, charging
+repetitions and the entire encoding of each variable.
 
 The same holds for the monotone interpolant (`Cslib.Logic.PL.CNF.monotoneInterpolantCode`), from
 the same input, with its output in the binary encoding of monotone circuits
 `Cslib.Circuits.Monotone.encCode`
 (`Cslib.Logic.PL.CNF.computableInPolyTime_monotoneInterpolantCode`).
-Together with `Cslib.Logic.PL.CNF.IsProof.ofCode_monotoneInterpolantCode`, this is the effective
+Together with `Cslib.Logic.PL.ClauseSet.IsProof.ofCode_monotoneInterpolantCode`, this is the
+effective
 form of monotone feasible interpolation [Pudlák, Theorem 2][Pudlak1997].
 
 ## Main results
@@ -70,6 +77,32 @@ namespace Cslib.Logic.PL
 open Cslib.Circuits Cslib.Circuits.Boolean Turing.MultiTapeTM ComputableInPolyTime
 
 variable {Y Z : Type}
+
+/-- Equality of represented finite clauses is polynomial-time, using the executable
+`Clause.sameLiterals` comparison shared with certificate checking. -/
+private theorem eq_toFinset_polyTime {V : Type} [DecidableEq V] (enc : V ↪ List Bool) :
+    ComputableInPolyTime (fun p : Clause V × Clause V => decide (p.1.toFinset = p.2.toFinset))
+      (encPair (encList (encPair enc encBool)) (encList (encPair enc encBool))) encBool := by
+  convert Clause.computableInPolyTime_sameLiterals enc using 1
+  funext p
+  apply Bool.eq_iff_iff.2
+  simp only [decide_eq_true_eq, Clause.sameLiterals_eq_true_iff]
+
+/-- Membership of a represented finite clause in the represented input clause set is
+polynomial-time. Axiom lookup accepts permutations and repetitions of literals. -/
+private theorem mem_toClauseSet_polyTime {V : Type} [DecidableEq V] (enc : V ↪ List Bool) :
+    ComputableInPolyTime (fun p : CNF V × Clause V => decide (p.2.toFinset ∈ p.1.toClauseSet))
+      (encPair (encList (encList (encPair enc encBool))) (encList (encPair enc encBool)))
+      encBool := by
+  have hq := id' (encIn := encPair (encList (encList (encPair enc encBool)))
+    (encList (encPair enc encBool)))
+  have h := anyWithInput (test := fun (p : CNF V × Clause V) (d : Clause V) =>
+      decide (d.toFinset = p.2.toFinset)) hq.fst'
+    ((eq_toFinset_polyTime enc).comp ((snd _ _).prod (fst _ _).snd'))
+  convert h using 1
+  funext p
+  apply Bool.eq_iff_iff.2
+  simp only [decide_eq_true_eq, List.any_eq_true, CNF.mem_toClauseSet]
 
 namespace Interpolant
 
@@ -172,34 +205,39 @@ private theorem resolventGates_polyTime :
 
 variable [DecidableEq Y] [DecidableEq Z]
 
-/-- Resolvents are computed in polynomial time. -/
-private theorem resolvent_polyTime :
-    ComputableInPolyTime (fun q : (Clause (ℕ ⊕ (Y ⊕ Z)) × Clause (ℕ ⊕ (Y ⊕ Z))) × (ℕ ⊕ (Y ⊕ Z)) =>
-        q.1.1.resolvent q.1.2 q.2)
-      (encPair (encPair (encList (encPair (encSum encNat (encSum encY encZ)) encBool))
-        (encList (encPair (encSum encNat (encSum encY encZ)) encBool)))
+/-- Test a finite resolvent against list clause syntax in polynomial time. The temporary list
+is only an executable representation: the comparison is equality of finite clauses. -/
+private theorem resolvent_eq_polyTime :
+    ComputableInPolyTime (fun q :
+        ((Clause (ℕ ⊕ (Y ⊕ Z)) × Clause (ℕ ⊕ (Y ⊕ Z))) × (ℕ ⊕ (Y ⊕ Z))) ×
+          Clause (ℕ ⊕ (Y ⊕ Z)) =>
+        decide (FiniteClause.resolvent q.1.1.1.toFinset q.1.1.2.toFinset q.1.2 = q.2.toFinset))
+      (encPair (encPair
+        (encPair (encList (encPair (encSum encNat (encSum encY encZ)) encBool))
+          (encList (encPair (encSum encNat (encSum encY encZ)) encBool)))
         (encSum encNat (encSum encY encZ)))
-      (encList (encPair (encSum encNat (encSum encY encZ)) encBool)) := by
-  unfold Clause.resolvent
-  have hq := id' (encIn := encPair (encPair (encList (encPair (encSum encNat (encSum encY encZ))
-    encBool)) (encList (encPair (encSum encNat (encSum encY encZ)) encBool)))
+        (encList (encPair (encSum encNat (encSum encY encZ)) encBool))) encBool := by
+  have hq := id' (encIn := encPair (encPair
+    (encPair (encList (encPair (encSum encNat (encSum encY encZ)) encBool))
+      (encList (encPair (encSum encNat (encSum encY encZ)) encBool)))
     (encSum encNat (encSum encY encZ)))
-  exact listAppend' (filterWithInput hq.fst'.fst'
-      (decide_not (decide_eq' (snd _ _) ((fst _ _).snd'.prod (const true)))))
-    (filterWithInput hq.fst'.snd'
-      (decide_not (decide_eq' (snd _ _) ((fst _ _).snd'.prod (const false)))))
-
-/-- Candidate resolution steps are listed in polynomial time. -/
-private theorem candidates_polyTime {V : Type} {encV : V ↪ List Bool} :
-    ComputableInPolyTime (candidates (V := V)) (encList (encList (encPair encV encBool)))
-      (encList (encPair (encPair (encList (encPair encV encBool)) encUnary)
-        (encPair (encPair (encList (encPair encV encBool)) encUnary) encV))) := by
-  have hzip :=
-    (ComputableTidilyInPolyTime.zipIdx (encList (encPair encV encBool))).computableInPolyTime
-  unfold candidates
-  refine flatMapWithInput hzip (flatMapWithInput (hzip.comp (fst _ _))
-    (mapWithInput (fst _ _).snd'.fst' ?_))
-  exact (fst _ _).fst'.snd'.prod ((fst _ _).snd'.prod (snd _ _).fst')
+    (encList (encPair (encSum encNat (encSum encY encZ)) encBool)))
+  have hres := listAppend'
+    (filterWithInput (test := fun q l => decide (l ≠ (q.1.2, true))) hq.fst'.fst'.fst'
+      (decide_not (decide_eq' (snd _ _) (((hq.fst'.snd').comp (fst _ _)).prod (const true)))))
+    (filterWithInput (test := fun q l => decide (l ≠ (q.1.2, false))) hq.fst'.fst'.snd'
+      (decide_not (decide_eq' (snd _ _) (((hq.fst'.snd').comp (fst _ _)).prod (const false)))))
+  have hsame := (eq_toFinset_polyTime (encSum encNat (encSum encY encZ))).comp
+    (hres.prod hq.snd')
+  convert hsame using 1
+  funext q
+  apply Bool.eq_iff_iff.2
+  simp only [Function.comp_apply, decide_eq_true_eq]
+  have heq : FiniteClause.resolvent q.1.1.1.toFinset q.1.1.2.toFinset q.1.2 =
+      ((q.1.1.1.filter fun l => decide (l ≠ (q.1.2, true))) ++
+        (q.1.1.2.filter fun l => decide (l ≠ (q.1.2, false)))).toFinset :=
+    (Resolution.Certificate.toFinset_resolveLiterals q.1.1.1 q.1.1.2 q.1.2).symm
+  rw [heq]
 
 /-- The four gates of a line are computed in polynomial time from the number of inputs in unary,
 the two formulas, the earlier lines and the line. -/
@@ -220,10 +258,12 @@ private theorem lineGates_polyTime :
   have hn := hq.fst'.fst'
   have hc := hq.snd'.snd'
   have hE := hq.snd'.fst'
-  have hmemA := decide_mem ((CNF.computableInPolyTime_relabel (sumMap_inl (encZ := encZ))).comp
-    hq.fst'.snd'.fst') hc
-  have hmemB := decide_mem ((CNF.computableInPolyTime_relabel (sumMap_inr (encY := encY))).comp
-    hq.fst'.snd'.snd') hc
+  have hmemA := (mem_toClauseSet_polyTime (encSum encNat (encSum encY encZ))).comp
+    (((CNF.computableInPolyTime_relabel (sumMap_inl (encZ := encZ))).comp
+    hq.fst'.snd'.fst').prod hc)
+  have hmemB := (mem_toClauseSet_polyTime (encSum encNat (encSum encY encZ))).comp
+    (((CNF.computableInPolyTime_relabel (sumMap_inr (encY := encY))).comp
+    hq.fst'.snd'.snd').prod hc)
   have hbin := ComputableTidilyInPolyTime.unary_to_binary.computableInPolyTime
   -- the search for a resolution step deriving the line
   have hp := id' (encIn := encPair (encPair (encPair encUnary
@@ -239,10 +279,12 @@ private theorem lineGates_polyTime :
   have hv := hp.snd'.snd'.snd'
   have htest := decide_and (decide_mem hc₁ (hv.prod (const true)))
     (decide_and (decide_mem hc₂ (hv.prod (const false)))
-      (decide_eq' (resolvent_polyTime.comp ((hc₁.prod hc₂).prod hv)) hp.fst'.snd'.snd'))
+      (resolvent_eq_polyTime.comp (((hc₁.prod hc₂).prod hv).prod hp.fst'.snd'.snd')))
   have hfind := findWithInput (test := fun q t => decide ((t.2.2, true) ∈ t.1.1 ∧
-    (t.2.2, false) ∈ t.2.1.1 ∧ t.1.1.resolvent t.2.1.1 t.2.2 = q.2.2))
-    (candidates_polyTime.comp hE) htest
+    (t.2.2, false) ∈ t.2.1.1 ∧
+      FiniteClause.resolvent t.1.1.toFinset t.2.1.1.toFinset t.2.2 = q.2.2.toFinset))
+    ((Resolution.Certificate.computableInPolyTime_candidates
+      (encSum encNat (encSum encY encZ))).comp hE) htest
   -- the gates of the step found
   have hm := hp.fst'.fst'.fst'
   have hbody := resolventGates_polyTime.comp
@@ -260,6 +302,42 @@ private theorem lineGates_polyTime :
       resolventGates (q.1.1 + 4 * q.2.1.length) (q.1.1 + 4 * t.1.2 + 3)
         (q.1.1 + 4 * t.2.1.2 + 3) t.2.2) hfind (const _) hbody))
 
+/-- The gate-list builder is polynomial-time. Its per-line callback is certified separately so
+composing the complete builder does not unfold resolution search during elaboration. -/
+private theorem gates_polyTime :
+    ComputableInPolyTime (fun p : ℕ × (CNF (ℕ ⊕ Y) × CNF (ℕ ⊕ Z)) ×
+        List (Clause (ℕ ⊕ (Y ⊕ Z))) => gates p.1 p.2.1.1 p.2.1.2 p.2.2)
+      (encPair encUnary (encPair (encPair (encList (encList (encPair (encSum encNat encY) encBool)))
+        (encList (encList (encPair (encSum encNat encZ) encBool))))
+        (encList (encList (encPair (encSum encNat (encSum encY encZ)) encBool)))))
+      (encList encGate) := by
+  have hp := id' (encIn := encPair encUnary (encPair (encPair
+    (encList (encList (encPair (encSum encNat encY) encBool)))
+    (encList (encList (encPair (encSum encNat encZ) encBool))))
+    (encList (encList (encPair (encSum encNat (encSum encY encZ)) encBool)))))
+  have hzip := (ComputableTidilyInPolyTime.zipIdx
+    (encList (encPair (encSum encNat (encSum encY encZ)) encBool))).computableInPolyTime
+  have htake := (ComputableTidilyInPolyTime.takeUnary
+    (encList (encPair (encSum encNat (encSum encY encZ)) encBool))).computableInPolyTime
+  have hbody : ComputableInPolyTime
+      (fun p : (ℕ × (CNF (ℕ ⊕ Y) × CNF (ℕ ⊕ Z)) ×
+          List (Clause (ℕ ⊕ (Y ⊕ Z)))) × (Clause (ℕ ⊕ (Y ⊕ Z)) × ℕ) =>
+        lineGates p.1.1 p.1.2.1.1 p.1.2.1.2 (p.1.2.2.take p.2.2) p.2.1)
+      (encPair (encPair encUnary (encPair (encPair
+        (encList (encList (encPair (encSum encNat encY) encBool)))
+        (encList (encList (encPair (encSum encNat encZ) encBool))))
+        (encList (encList (encPair (encSum encNat (encSum encY encZ)) encBool)))))
+        (encPair (encList (encPair (encSum encNat (encSum encY encZ)) encBool)) encUnary))
+      (encList encGate) := by
+    simpa only [Function.comp_def] using lineGates_polyTime.comp
+      (((fst _ _).fst'.prod (fst _ _).snd'.fst').prod
+        ((htake.comp ((hp.snd'.snd'.comp (fst _ _)).prod (snd _ _).snd')).prod
+          (snd _ _).fst'))
+  simpa only [gates, Function.comp_def] using flatMapWithInput (f := fun
+    (p : ℕ × (CNF (ℕ ⊕ Y) × CNF (ℕ ⊕ Z)) × List (Clause (ℕ ⊕ (Y ⊕ Z))))
+    (e : Clause (ℕ ⊕ (Y ⊕ Z)) × ℕ) =>
+      lineGates p.1 p.2.1.1 p.2.1.2 (p.2.2.take e.2) e.1) (hzip.comp hp.snd'.snd') hbody
+
 end Interpolant
 
 variable [DecidableEq Y] [DecidableEq Z]
@@ -268,8 +346,11 @@ variable [DecidableEq Y] [DecidableEq Z]
 resolution refutation (`Cslib.Logic.PL.CNF.interpolantCode`) is computed in polynomial time from
 the number of inputs in unary, the two formulas and the lines of the refutation. Shared variables
 are written in binary, private variables in any encodings `encY` and `encZ`, and the circuit code
-in the binary encoding `Cslib.Circuits.Boolean.encCode`. On a refutation, the code is that of a
-circuit computing an interpolant (`Cslib.Logic.PL.CNF.IsProof.ofCode_interpolantCode`). -/
+in the binary encoding `Cslib.Circuits.Boolean.encCode`. Axiom and resolvent searches compare the
+represented finite clauses. The polynomial-time comparison is realized by the shared
+`Clause.sameLiterals` algorithm, including permutations and repeated literals in the certificate.
+On a refutation, the code is that of a circuit computing an interpolant
+(`Cslib.Logic.PL.ClauseSet.IsProof.ofCode_interpolantCode`). -/
 theorem CNF.computableInPolyTime_interpolantCode (encY : Y ↪ List Bool) (encZ : Z ↪ List Bool) :
     ComputableInPolyTime (fun p : ℕ × (CNF (ℕ ⊕ Y) × CNF (ℕ ⊕ Z)) ×
         List (Clause (ℕ ⊕ (Y ⊕ Z))) => CNF.interpolantCode p.1 p.2.1.1 p.2.1.2 p.2.2)
@@ -283,19 +364,10 @@ theorem CNF.computableInPolyTime_interpolantCode (encY : Y ↪ List Bool) (encZ 
     (encList (encList (encPair (encSum encNat (encSum encY encZ)) encBool)))))
   have hrev := (ComputableTidilyInPolyTime.listReverse
     (encList (encPair (encSum encNat (encSum encY encZ)) encBool))).computableInPolyTime
-  have hzip := (ComputableTidilyInPolyTime.zipIdx
-    (encList (encPair (encSum encNat (encSum encY encZ)) encBool))).computableInPolyTime
-  have htake := (ComputableTidilyInPolyTime.takeUnary
-    (encList (encPair (encSum encNat (encSum encY encZ)) encBool))).computableInPolyTime
   have hbin := ComputableTidilyInPolyTime.unary_to_binary.computableInPolyTime
   have hlines := hrev.comp hp.snd'.snd'
-  -- the gates, line by line
-  have hgates := flatMapWithInput (f := fun (p : ℕ × (CNF (ℕ ⊕ Y) × CNF (ℕ ⊕ Z)) ×
-      List (Clause (ℕ ⊕ (Y ⊕ Z)))) (e : Clause (ℕ ⊕ (Y ⊕ Z)) × ℕ) =>
-        Interpolant.lineGates p.1 p.2.1.1 p.2.1.2 (p.2.2.reverse.take e.2) e.1)
-    (hzip.comp hlines) (Interpolant.lineGates_polyTime.comp
-      (((fst _ _).fst'.prod (fst _ _).snd'.fst').prod
-        ((htake.comp ((hlines.comp (fst _ _)).prod (snd _ _).snd')).prod (snd _ _).fst')))
+  have hgates := Interpolant.gates_polyTime.comp
+    (hp.fst'.prod (hp.snd'.fst'.prod hlines))
   -- the output wire
   have hempty := mapWithInput (f := fun (_ : ℕ × (CNF (ℕ ⊕ Y) × CNF (ℕ ⊕ Z)) ×
       List (Clause (ℕ ⊕ (Y ⊕ Z)))) (c : Clause (ℕ ⊕ (Y ⊕ Z))) => c.isEmpty) hlines
@@ -304,7 +376,8 @@ theorem CNF.computableInPolyTime_interpolantCode (encY : Y ↪ List Bool) (encZ 
   have hidx := (ComputableTidilyInPolyTime.idxOf encBool).computableInPolyTime.comp
     (hempty.prod (const true))
   have hout := hbin.comp (unary_add' (unary_add' hp.fst' (unary_mul' (const 4) hidx)) (const 3))
-  exact hgates.prod (cons' hout (const []))
+  simpa only [CNF.interpolantCode, Interpolant.outputWire, encCode, Function.comp_def] using
+    hgates.prod (cons' hout (const []))
 
 /-! ### The monotone interpolant -/
 
@@ -403,10 +476,12 @@ private theorem lineGates_polyTime :
       (encList (encPair (encSum encNat (encSum encY encZ)) encBool))))
   have hc := hq.snd'.snd'
   have hE := hq.snd'.fst'
-  have hmemA := decide_mem ((CNF.computableInPolyTime_relabel
-    (Interpolant.sumMap_inl (encZ := encZ))).comp hq.fst'.snd'.fst') hc
-  have hmemB := decide_mem ((CNF.computableInPolyTime_relabel
-    (Interpolant.sumMap_inr (encY := encY))).comp hq.fst'.snd'.snd') hc
+  have hmemA := (mem_toClauseSet_polyTime (encSum encNat (encSum encY encZ))).comp
+    (((CNF.computableInPolyTime_relabel
+    (Interpolant.sumMap_inl (encZ := encZ))).comp hq.fst'.snd'.fst').prod hc)
+  have hmemB := (mem_toClauseSet_polyTime (encSum encNat (encSum encY encZ))).comp
+    (((CNF.computableInPolyTime_relabel
+    (Interpolant.sumMap_inr (encY := encY))).comp hq.fst'.snd'.snd').prod hc)
   have hbin := ComputableTidilyInPolyTime.unary_to_binary.computableInPolyTime
   -- the search for a resolution step deriving the line
   have hp := id' (encIn := encPair (encPair (encPair encUnary
@@ -422,11 +497,13 @@ private theorem lineGates_polyTime :
   have hv := hp.snd'.snd'.snd'
   have htest := decide_and (decide_mem hc₁ (hv.prod (const true)))
     (decide_and (decide_mem hc₂ (hv.prod (const false)))
-      (decide_eq' (Interpolant.resolvent_polyTime.comp ((hc₁.prod hc₂).prod hv))
-        hp.fst'.snd'.snd'))
+      (Interpolant.resolvent_eq_polyTime.comp
+        (((hc₁.prod hc₂).prod hv).prod hp.fst'.snd'.snd')))
   have hfind := findWithInput (test := fun q t => decide ((t.2.2, true) ∈ t.1.1 ∧
-    (t.2.2, false) ∈ t.2.1.1 ∧ t.1.1.resolvent t.2.1.1 t.2.2 = q.2.2))
-    (Interpolant.candidates_polyTime.comp hE) htest
+    (t.2.2, false) ∈ t.2.1.1 ∧
+      FiniteClause.resolvent t.1.1.toFinset t.2.1.1.toFinset t.2.2 = q.2.2.toFinset))
+    ((Resolution.Certificate.computableInPolyTime_candidates
+      (encSum encNat (encSum encY encZ))).comp hE) htest
   -- the gates of the step found
   have hm := hp.fst'.fst'.fst'
   have hbody := resolventGates_polyTime.comp
@@ -445,6 +522,43 @@ private theorem lineGates_polyTime :
       resolventGates (positive q.1.2.1) (q.1.1 + 2 * q.2.1.length) (q.1.1 + 2 * t.1.2 + 1)
         (q.1.1 + 2 * t.2.1.2 + 1) t.2.2) hfind (const _) hbody))
 
+/-- The gate-list builder is polynomial-time. Its per-line callback is certified separately so
+composing the complete builder does not unfold resolution search during elaboration. -/
+private theorem gates_polyTime :
+    ComputableInPolyTime (fun p : ℕ × (CNF (ℕ ⊕ Y) × CNF (ℕ ⊕ Z)) ×
+        List (Clause (ℕ ⊕ (Y ⊕ Z))) => gates (positive p.2.1.1) p.1 p.2.1.1 p.2.1.2 p.2.2)
+      (encPair encUnary (encPair (encPair (encList (encList (encPair (encSum encNat encY) encBool)))
+        (encList (encList (encPair (encSum encNat encZ) encBool))))
+        (encList (encList (encPair (encSum encNat (encSum encY encZ)) encBool)))))
+      (encList Monotone.encGate) := by
+  have hp := id' (encIn := encPair encUnary (encPair (encPair
+    (encList (encList (encPair (encSum encNat encY) encBool)))
+    (encList (encList (encPair (encSum encNat encZ) encBool))))
+    (encList (encList (encPair (encSum encNat (encSum encY encZ)) encBool)))))
+  have hzip := (ComputableTidilyInPolyTime.zipIdx
+    (encList (encPair (encSum encNat (encSum encY encZ)) encBool))).computableInPolyTime
+  have htake := (ComputableTidilyInPolyTime.takeUnary
+    (encList (encPair (encSum encNat (encSum encY encZ)) encBool))).computableInPolyTime
+  have hbody : ComputableInPolyTime
+      (fun p : (ℕ × (CNF (ℕ ⊕ Y) × CNF (ℕ ⊕ Z)) ×
+          List (Clause (ℕ ⊕ (Y ⊕ Z)))) × (Clause (ℕ ⊕ (Y ⊕ Z)) × ℕ) =>
+        lineGates (positive p.1.2.1.1) p.1.1 p.1.2.1.1 p.1.2.1.2
+          (p.1.2.2.take p.2.2) p.2.1)
+      (encPair (encPair encUnary (encPair (encPair
+        (encList (encList (encPair (encSum encNat encY) encBool)))
+        (encList (encList (encPair (encSum encNat encZ) encBool))))
+        (encList (encList (encPair (encSum encNat (encSum encY encZ)) encBool)))))
+        (encPair (encList (encPair (encSum encNat (encSum encY encZ)) encBool)) encUnary))
+      (encList Monotone.encGate) := by
+    simpa only [Function.comp_def] using lineGates_polyTime.comp
+      (((fst _ _).fst'.prod (fst _ _).snd'.fst').prod
+        ((htake.comp ((hp.snd'.snd'.comp (fst _ _)).prod (snd _ _).snd')).prod
+          (snd _ _).fst'))
+  simpa only [gates, Function.comp_def] using flatMapWithInput (f := fun
+    (p : ℕ × (CNF (ℕ ⊕ Y) × CNF (ℕ ⊕ Z)) × List (Clause (ℕ ⊕ (Y ⊕ Z))))
+    (e : Clause (ℕ ⊕ (Y ⊕ Z)) × ℕ) => lineGates (positive p.2.1.1) p.1 p.2.1.1 p.2.1.2
+      (p.2.2.take e.2) e.1) (hzip.comp hp.snd'.snd') hbody
+
 end MonotoneInterpolant
 
 /-- **Extracting monotone interpolants in polynomial time.** The code of the monotone interpolant
@@ -454,7 +568,7 @@ refutation, encoded as for `Cslib.Logic.PL.CNF.computableInPolyTime_interpolantC
 code is written in the binary encoding `Cslib.Circuits.Monotone.encCode`. On a refutation whose
 shared variables occur only positively in `A` or only negatively in `B`, the code is that of a
 monotone circuit computing an interpolant
-(`Cslib.Logic.PL.CNF.IsProof.ofCode_monotoneInterpolantCode`). -/
+(`Cslib.Logic.PL.ClauseSet.IsProof.ofCode_monotoneInterpolantCode`). -/
 theorem CNF.computableInPolyTime_monotoneInterpolantCode (encY : Y ↪ List Bool)
     (encZ : Z ↪ List Bool) :
     ComputableInPolyTime (fun ((n, (A, B), ls) : ℕ × (CNF (ℕ ⊕ Y) × CNF (ℕ ⊕ Z)) ×
@@ -469,20 +583,10 @@ theorem CNF.computableInPolyTime_monotoneInterpolantCode (encY : Y ↪ List Bool
     (encList (encList (encPair (encSum encNat (encSum encY encZ)) encBool)))))
   have hrev := (ComputableTidilyInPolyTime.listReverse
     (encList (encPair (encSum encNat (encSum encY encZ)) encBool))).computableInPolyTime
-  have hzip := (ComputableTidilyInPolyTime.zipIdx
-    (encList (encPair (encSum encNat (encSum encY encZ)) encBool))).computableInPolyTime
-  have htake := (ComputableTidilyInPolyTime.takeUnary
-    (encList (encPair (encSum encNat (encSum encY encZ)) encBool))).computableInPolyTime
   have hbin := ComputableTidilyInPolyTime.unary_to_binary.computableInPolyTime
   have hlines := hrev.comp hp.snd'.snd'
-  -- the gates, line by line
-  have hgates := flatMapWithInput (f := fun (p : ℕ × (CNF (ℕ ⊕ Y) × CNF (ℕ ⊕ Z)) ×
-      List (Clause (ℕ ⊕ (Y ⊕ Z)))) (e : Clause (ℕ ⊕ (Y ⊕ Z)) × ℕ) =>
-        MonotoneInterpolant.lineGates (MonotoneInterpolant.positive p.2.1.1) p.1 p.2.1.1 p.2.1.2
-          (p.2.2.reverse.take e.2) e.1)
-    (hzip.comp hlines) (MonotoneInterpolant.lineGates_polyTime.comp
-      (((fst _ _).fst'.prod (fst _ _).snd'.fst').prod
-        ((htake.comp ((hlines.comp (fst _ _)).prod (snd _ _).snd')).prod (snd _ _).fst')))
+  have hgates := MonotoneInterpolant.gates_polyTime.comp
+    (hp.fst'.prod (hp.snd'.fst'.prod hlines))
   -- the output wire
   have hempty := mapWithInput (f := fun (_ : ℕ × (CNF (ℕ ⊕ Y) × CNF (ℕ ⊕ Z)) ×
       List (Clause (ℕ ⊕ (Y ⊕ Z)))) (c : Clause (ℕ ⊕ (Y ⊕ Z))) => c.isEmpty) hlines
@@ -491,6 +595,8 @@ theorem CNF.computableInPolyTime_monotoneInterpolantCode (encY : Y ↪ List Bool
   have hidx := (ComputableTidilyInPolyTime.idxOf encBool).computableInPolyTime.comp
     (hempty.prod (const true))
   have hout := hbin.comp (unary_add' (unary_add' hp.fst' (unary_mul' (const 2) hidx)) (const 1))
-  exact hgates.prod (cons' hout (const []))
+  simpa only [CNF.monotoneInterpolantCode, MonotoneInterpolant.outputWire,
+    Monotone.encCode, Function.comp_def] using
+    hgates.prod (cons' hout (const []))
 
 end Cslib.Logic.PL

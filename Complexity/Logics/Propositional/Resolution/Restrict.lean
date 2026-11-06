@@ -1,95 +1,108 @@
 /-
-Copyright (c) 2026 Samuel Schlesinger. All rights reserved.
+Copyright (c) 2026 Samuel Schlesinger, Karn Seth. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
-Authors: Karn Seth
+Authors: Samuel Schlesinger, Karn Seth
 -/
 
 module
 -- upstream: candidate
 
+public import Complexity.Logics.Propositional.CNF.Restriction
 public import Complexity.Logics.Propositional.Resolution.Proof
 
 /-!
-# Evaluating a formula restricted by a partial assignment
+# Restriction and the syntax boundary
 
-The restriction `φ.restrictBy ρ` of a CNF formula by a partial assignment `ρ`
-(`Cslib.Logic.PL.CNF.restrictBy`) drops the clauses that `ρ` satisfies and removes the literals of
-the variables that `ρ` fixes from the others. This file relates it to `φ` under the total
-assignments that extend `ρ`.
+Mathematical restriction agrees with interpretation of restricted list syntax. Restriction
+preserves satisfaction under total assignments extending the partial one. The line-count and
+width guarantees for restricted proofs are in `Resolution.Proof`.
 
 ## Main results
 
-* `Cslib.Logic.PL.CNF.eval_restrictBy`: under an assignment that extends `ρ`, the restricted
-  formula has the value of `φ`.
-* `Cslib.Logic.PL.CNF.length_le_of_mem_restrictBy`: restriction does not widen clauses.
-* `Cslib.Logic.PL.CNF.exists_preimage_restrictBy`: a list of clauses of the restricted formula
-  comes, clause by clause, from a list of clauses of `φ` with the same value under every
-  extension of `ρ`.
+* `Cslib.Logic.PL.CNF.toClauseSet_restrict`, `Cslib.Logic.PL.CNF.toClauseSet_restrictBy`:
+  list-syntax restriction agrees with mathematical restriction.
+* `Cslib.Logic.PL.ClauseSet.eval_restrictBy`: evaluation under extending assignments.
 -/
 
-@[expose] public section
+public section
 
 namespace Cslib.Logic.PL
 
-variable {V : Type*} {φ : CNF V} {ρ : V → Option Bool} {γ : V → Bool}
+variable {V : Type*} [DecidableEq V]
 
-/-- Under an assignment that extends `ρ`, a clause that `ρ` does not satisfy has the value of its
-literals on the variables that `ρ` does not fix. -/
-theorem Clause.eval_filter_of_extends (hγ : ∀ v b, ρ v = some b → γ v = b) {d : Clause V}
+/-- Restriction of syntax commutes with its interpretation as a clause set. -/
+@[simp] theorem CNF.toClauseSet_restrict (φ : CNF V) (v : V) (b : Bool) :
+    (φ.restrict v b).toClauseSet = φ.toClauseSet.restrict v b := by
+  ext c
+  constructor
+  · intro hc
+    obtain ⟨d, hd, rfl⟩ := CNF.mem_toClauseSet.1 hc
+    obtain ⟨e, he, hv, rfl⟩ := CNF.mem_restrict.1 hd
+    refine ClauseSet.mem_restrict.2 ⟨e.toFinset, CNF.mem_toClauseSet.2 ⟨e, he, rfl⟩,
+      by simpa using hv, ?_⟩
+    ext l
+    simp
+  · intro hc
+    obtain ⟨d, hd, hv, rfl⟩ := ClauseSet.mem_restrict.1 hc
+    obtain ⟨e, he, rfl⟩ := CNF.mem_toClauseSet.1 hd
+    refine CNF.mem_toClauseSet.2 ⟨e.filter (· ≠ (v, !b)),
+      CNF.mem_restrict.2 ⟨e, he, by simpa using hv, rfl⟩, ?_⟩
+    ext l
+    simp
+
+/-- Partial-assignment restriction commutes with the syntax interpretation. -/
+@[simp] theorem CNF.toClauseSet_restrictBy (φ : CNF V) (ρ : V → Option Bool) :
+    (φ.restrictBy ρ).toClauseSet = φ.toClauseSet.restrictBy ρ := by
+  ext c
+  constructor
+  · intro hc
+    obtain ⟨d, hd, rfl⟩ := CNF.mem_toClauseSet.1 hc
+    obtain ⟨e, he, hv, rfl⟩ := CNF.mem_restrictBy.1 hd
+    refine ClauseSet.mem_restrictBy.2 ⟨e.toFinset, CNF.mem_toClauseSet.2 ⟨e, he, rfl⟩,
+      by simpa using hv, ?_⟩
+    ext l
+    simp
+  · intro hc
+    obtain ⟨d, hd, hv, rfl⟩ := ClauseSet.mem_restrictBy.1 hc
+    obtain ⟨e, he, rfl⟩ := CNF.mem_toClauseSet.1 hd
+    refine CNF.mem_toClauseSet.2 ⟨e.filter (fun l => decide (ρ l.1 = none)),
+      CNF.mem_restrictBy.2 ⟨e, he, by simpa using hv, rfl⟩, ?_⟩
+    ext l
+    simp
+
+omit [DecidableEq V] in
+/-- An unsatisfied clause keeps its value after deleting assigned variables. -/
+theorem FiniteClause.eval_filter_of_extends {ρ : V → Option Bool} {γ : V → Bool}
+    (hγ : ∀ v b, ρ v = some b → γ v = b) {d : FiniteClause V}
     (hd : ∀ l ∈ d, ρ l.1 ≠ some l.2) :
-    Clause.eval γ (d.filter fun l => decide (ρ l.1 = none)) = d.eval γ := by
-  rw [Bool.eq_iff_iff, Clause.eval_eq_true_iff, Clause.eval_eq_true_iff]
+    FiniteClause.eval γ (d.filter fun l => ρ l.1 = none) = d.eval γ := by
+  rw [Bool.eq_iff_iff, FiniteClause.eval_eq_true_iff, FiniteClause.eval_eq_true_iff]
   constructor
   · rintro ⟨l, hl, hls⟩
-    exact ⟨l, (List.mem_filter.1 hl).1, hls⟩
+    exact ⟨l, (Finset.mem_filter.1 hl).1, hls⟩
   · rintro ⟨l, hl, hls⟩
     cases hρ : ρ l.1 with
-    | none => exact ⟨l, List.mem_filter.2 ⟨hl, by simp [hρ]⟩, hls⟩
+    | none => exact ⟨l, Finset.mem_filter.2 ⟨hl, hρ⟩, hls⟩
     | some b =>
       rw [← hγ _ _ hρ, hls] at hρ
       exact absurd hρ (hd l hl)
 
-/-- **Restriction preserves the value under extensions**: an assignment that extends `ρ` satisfies
-`φ.restrictBy ρ` exactly when it satisfies `φ`. -/
-theorem CNF.eval_restrictBy (hγ : ∀ v b, ρ v = some b → γ v = b) :
+/-- Under an extending assignment, restriction preserves the value of a clause set. -/
+theorem ClauseSet.eval_restrictBy {φ : ClauseSet V} {ρ : V → Option Bool} {γ : V → Bool}
+    (hγ : ∀ v b, ρ v = some b → γ v = b) :
     (φ.restrictBy ρ).eval γ = φ.eval γ := by
-  rw [Bool.eq_iff_iff, CNF.eval_eq_true_iff, CNF.eval_eq_true_iff]
+  rw [Bool.eq_iff_iff, ClauseSet.eval_eq_true_iff, ClauseSet.eval_eq_true_iff]
   constructor
   · intro h d hd
     by_cases hsat : ∀ l ∈ d, ρ l.1 ≠ some l.2
-    · rw [← Clause.eval_filter_of_extends hγ hsat]
-      exact h _ (CNF.mem_restrictBy.2 ⟨d, hd, hsat, rfl⟩)
+    · rw [← FiniteClause.eval_filter_of_extends hγ hsat]
+      exact h _ (ClauseSet.mem_restrictBy.2 ⟨d, hd, hsat, rfl⟩)
     · push Not at hsat
       obtain ⟨l, hl, hρ⟩ := hsat
-      exact (Clause.eval_eq_true_iff γ d).2 ⟨l, hl, hγ _ _ hρ⟩
+      exact (FiniteClause.eval_eq_true_iff γ d).2 ⟨l, hl, hγ _ _ hρ⟩
   · intro h c hc
-    obtain ⟨d, hd, hsat, rfl⟩ := CNF.mem_restrictBy.1 hc
-    rw [Clause.eval_filter_of_extends hγ hsat]
+    obtain ⟨d, hd, hsat, rfl⟩ := ClauseSet.mem_restrictBy.1 hc
+    rw [FiniteClause.eval_filter_of_extends hγ hsat]
     exact h d hd
-
-/-- Restriction does not widen clauses. -/
-theorem CNF.length_le_of_mem_restrictBy {k : ℕ} (hlen : ∀ c ∈ φ, c.length ≤ k) :
-    ∀ c ∈ φ.restrictBy ρ, c.length ≤ k := by
-  intro c hc
-  obtain ⟨d, hd, -, rfl⟩ := CNF.mem_restrictBy.1 hc
-  exact (List.length_filter_le _ _).trans (hlen d hd)
-
-/-- **Preimages of restricted clauses**: a list of clauses of `φ.restrictBy ρ` has, clause by
-clause, a list of clauses of `φ` of the same length with the same value under every extension of
-`ρ`. -/
-theorem CNF.exists_preimage_restrictBy :
-    ∀ {ψ : CNF V}, (∀ c ∈ ψ, c ∈ φ.restrictBy ρ) →
-      ∃ χ : CNF V, (∀ d ∈ χ, d ∈ φ) ∧ χ.length = ψ.length ∧
-        ∀ γ : V → Bool, (∀ v b, ρ v = some b → γ v = b) → χ.eval γ = ψ.eval γ
-  | [], _ => ⟨[], by simp, rfl, fun _ _ => rfl⟩
-  | c :: ψ, hψ => by
-    obtain ⟨d, hd, hsat, rfl⟩ := CNF.mem_restrictBy.1 (hψ c List.mem_cons_self)
-    obtain ⟨χ, hχ, hlen, heval⟩ :=
-      CNF.exists_preimage_restrictBy fun c hc => hψ c (List.mem_cons_of_mem _ hc)
-    refine ⟨d :: χ, ?_, by rw [List.length_cons, List.length_cons, hlen], fun γ hγ => ?_⟩
-    · rintro e he
-      rcases List.mem_cons.1 he with rfl | he
-      exacts [hd, hχ e he]
-    · rw [CNF.eval_cons, CNF.eval_cons, Clause.eval_filter_of_extends hγ hsat, heval γ hγ]
 
 end Cslib.Logic.PL

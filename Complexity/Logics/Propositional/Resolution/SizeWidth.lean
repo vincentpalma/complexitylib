@@ -18,11 +18,11 @@ import Mathlib.Algebra.BigOperators.Group.Finset.Basic
 [Ben-Sasson and Wigderson][BenSassonWigderson2001] showed that short resolution refutations can be
 made narrow: a formula whose clauses have width at most `k`, over `N` variables, with a refutation
 of `s` lines has a refutation of width at most `k + O(√(N log s))`
-(`Cslib.Logic.PL.CNF.exists_refutableInWidth_le_of_refutableInSize`). Lower bounds on width thus
-give lower bounds on size.
+(`Cslib.Logic.PL.ClauseSet.exists_refutableInWidth_le_of_refutableInSize`). Lower bounds on width
+thus give lower bounds on size.
 
 The proof fixes variables one at a time. Its core is a lemma about a single variable
-(`Cslib.Logic.PL.CNF.RefutableInWidth.of_restrict`): if fixing `v` to `b` leaves a formula
+(`Cslib.Logic.PL.ClauseSet.RefutableInWidth.of_restrict`): if fixing `v` to `b` leaves a formula
 refutable in width `w`, and fixing `v` to `!b` leaves one refutable in width `w + 1`, then the
 formula is refutable in width `w + 1`, provided its clauses have width at most `w + 1`. Lifting the
 first refutation derives the unit clause of `v` with the value `!b`, at the cost of one more
@@ -35,19 +35,19 @@ wide lines, some literal occurs in at least a `d / 2N` fraction of them, and fix
 satisfies those lines and leaves a refutation of the restricted formula with at most
 `f (1 - d / 2N)` wide lines; fixing it to be false leaves at most `f` of them, over fewer variables.
 By induction, if `f (2N - d) ^ b < (2N) ^ b` then the formula is refutable in width `max d k + b`
-(`Cslib.Logic.PL.CNF.RefutableInWidth.of_refutableInSize`). Choosing `d` and `b` of order
+(`Cslib.Logic.PL.ClauseSet.RefutableInWidth.of_refutableInSize`). Choosing `d` and `b` of order
 `√(N log s)` gives the tradeoff.
 
 ## Main results
 
-* `Cslib.Logic.PL.CNF.RefutableInWidth.of_restrict`: the key lemma on fixing one variable.
-* `Cslib.Logic.PL.CNF.RefutableInWidth.of_refutableInSize`: refutations with few wide lines can be
-  made narrow.
-* `Cslib.Logic.PL.CNF.exists_refutableInWidth_le_of_refutableInSize`: **the size–width
+* `Cslib.Logic.PL.ClauseSet.RefutableInWidth.of_restrict`: the key lemma on fixing one variable.
+* `Cslib.Logic.PL.ClauseSet.RefutableInWidth.of_refutableInSize`: refutations with few wide lines
+  can be made narrow.
+* `Cslib.Logic.PL.ClauseSet.exists_refutableInWidth_le_of_refutableInSize`: **the size–width
   tradeoff**: a formula with clauses of width at most `k` over `N` variables, refutable with `s`
   lines, is refutable in width at most `k + 2 √(2 N log s) + 2`.
-* `Cslib.Logic.PL.CNF.exp_le_of_refutableInSize`: the same as a size lower bound: if refutations
-  need width `W ≥ k + 2`, they need `exp ((W - k - 2)² / 8N)` lines.
+* `Cslib.Logic.PL.ClauseSet.exp_le_of_refutableInSize`: the same as a size lower bound: if
+  refutations need width `W ≥ k + 2`, they need `exp ((W - k - 2)² / 8N)` lines.
 
 ## References
 
@@ -61,14 +61,14 @@ namespace Cslib.Logic.PL
 
 variable {V : Type*} [DecidableEq V]
 
-namespace CNF
+namespace ClauseSet
 
-variable {φ : CNF V}
+variable {φ : ClauseSet V}
 
 /-! ### Fixing one variable -/
 
 /-- Lines resolved from lines of a proof, or clauses of the formula, extend the proof. -/
-theorem IsProof.append_of_forall {ls es : List (Clause V)} (h : φ.IsProof ls)
+theorem IsProof.append_of_forall {ls es : List (FiniteClause V)} (h : φ.IsProof ls)
     (hes : ∀ e ∈ es, e ∈ φ ∨ ∃ c₁ ∈ ls, ∃ c₂ ∈ ls, ∃ u, (u, true) ∈ c₁ ∧ (u, false) ∈ c₂ ∧
       e = c₁.resolvent c₂ u) :
     φ.IsProof (es ++ ls) := by
@@ -81,14 +81,15 @@ theorem IsProof.append_of_forall {ls es : List (Clause V)} (h : φ.IsProof ls)
     · exact ih.resolvent u (List.mem_append_right _ h₁) (List.mem_append_right _ h₂) hu₁ hu₂
 
 /-- Clauses of a formula, listed in any order, form a proof from it. -/
-theorem IsProof.of_forall_mem {es : List (Clause V)} (hes : ∀ e ∈ es, e ∈ φ) : φ.IsProof es := by
+theorem IsProof.of_forall_mem {es : List (FiniteClause V)} (hes : ∀ e ∈ es, e ∈ φ) :
+    φ.IsProof es := by
   simpa using IsProof.nil.append_of_forall (φ := φ) fun e he => Or.inl (hes e he)
 
 /-- Fixing a variable does not widen clauses. -/
 theorem width_le_of_mem_restrict {v : V} {b : Bool} {k : ℕ} (hk : ∀ c ∈ φ, c.width ≤ k)
-    {c : Clause V} (hc : c ∈ φ.restrict v b) : c.width ≤ k := by
+    {c : FiniteClause V} (hc : c ∈ φ.restrict v b) : c.width ≤ k := by
   obtain ⟨d, hd, -, rfl⟩ := mem_restrict.1 hc
-  exact (Clause.width_le_width fun l hl => (List.mem_filter.1 hl).1).trans (hk d hd)
+  exact (Finset.card_le_card fun l hl => (Finset.mem_filter.1 hl).1).trans (hk d hd)
 
 /-- **Fixing one variable** [Ben-Sasson and Wigderson, Lemma 3.2][BenSassonWigderson2001]. If the
 clauses of `φ` have width at most `w + 1`, `φ` with `v` fixed to `b` is refutable in width `w`, and
@@ -97,86 +98,92 @@ theorem RefutableInWidth.of_restrict {v : V} {b : Bool} {w : ℕ}
     (hφ : ∀ c ∈ φ, c.width ≤ w + 1) (h₁ : (φ.restrict v b).RefutableInWidth w)
     (h₂ : (φ.restrict v (!b)).RefutableInWidth (w + 1)) : φ.RefutableInWidth (w + 1) := by
   obtain ⟨ls₁, hp₁, hnil₁, hw₁⟩ := h₁
-  obtain ⟨ls, hp, hup, hdown⟩ := hp₁.lift
+  obtain ⟨ls, hp, hup, hdown, -⟩ := hp₁.lift
   have hw : ∀ c ∈ ls, c.width ≤ w + 1 := fun c hc => by
     obtain ⟨c', hc', hsub⟩ := hdown c hc
-    exact (Clause.width_le_width_add_one hsub).trans (Nat.succ_le_succ (hw₁ c' hc'))
+    exact (FiniteClause.width_le_width_add_one hsub).trans (Nat.succ_le_succ (hw₁ c' hc'))
   -- lifting the first refutation derives a clause `c₀` whose literals are all `(v, !b)`
-  obtain ⟨c₀, hc₀, -, hc₀v⟩ := hup [] hnil₁
-  have hc₀v : ∀ l ∈ c₀, l = (v, !b) := fun l hl => (hc₀v l hl).resolve_left List.not_mem_nil
+  obtain ⟨c₀, hc₀, -, hc₀v⟩ := hup ∅ hnil₁
+  have hc₀v : ∀ l ∈ c₀, l = (v, !b) := fun l hl =>
+    (hc₀v l hl).resolve_left (Finset.notMem_empty _)
   by_cases hx : (v, !b) ∈ c₀
   swap
-  · have : c₀ = [] := List.eq_nil_iff_forall_not_mem.2 fun l hl => hx (hc₀v l hl ▸ hl)
+  · have : c₀ = ∅ := Finset.eq_empty_iff_forall_notMem.2 fun l hl => hx (hc₀v l hl ▸ hl)
     exact ⟨ls, hp, this ▸ hc₀, hw⟩
-  have hfilter : c₀.filter (· ≠ (v, !b)) = [] :=
-    List.filter_eq_nil_iff.2 fun l hl => by simpa using hc₀v l hl
+  have hc₀eq : c₀ = {(v, !b)} := by
+    ext l
+    exact ⟨fun hl => Finset.mem_singleton.2 (hc₀v l hl), fun hl =>
+      Finset.mem_singleton.1 hl ▸ hx⟩
   -- the clauses of the second restricted formula are clauses of `φ` or resolvents with `c₀`
-  have hψ : φ.IsProof (φ.restrict v (!b) ++ (φ ++ ls)) := by
-    refine ((IsProof.of_forall_mem fun e he => he).append hp).append_of_forall fun e he => ?_
-    obtain ⟨d, hd, -, rfl⟩ := mem_restrict.1 he
+  have hψ : φ.IsProof ((φ.restrict v (!b)).toList ++ (φ.toList ++ ls)) := by
+    refine ((IsProof.of_forall_mem fun e he => Finset.mem_toList.1 he).append hp).append_of_forall
+      fun e he => ?_
+    obtain ⟨d, hd, -, rfl⟩ := mem_restrict.1 (Finset.mem_toList.1 he)
     by_cases hvd : (v, b) ∈ d
     · refine Or.inr ?_
       cases b
-      · refine ⟨c₀, List.mem_append_right _ hc₀, d, List.mem_append_left _ hd, v, hx, hvd, ?_⟩
-        simp only [Clause.resolvent, Bool.not_false, Bool.not_true] at hfilter ⊢
-        rw [hfilter, List.nil_append]
-      · refine ⟨d, List.mem_append_left _ hd, c₀, List.mem_append_right _ hc₀, v, hvd, hx, ?_⟩
-        simp only [Clause.resolvent, Bool.not_true, Bool.not_false] at hfilter ⊢
-        rw [hfilter, List.append_nil]
+      · refine ⟨c₀, List.mem_append_right _ hc₀, d,
+          List.mem_append_left _ (Finset.mem_toList.2 hd), v, hx, hvd, ?_⟩
+        ext l
+        simp [FiniteClause.resolvent, hc₀eq, and_comm]
+      · refine ⟨d, List.mem_append_left _ (Finset.mem_toList.2 hd), c₀,
+          List.mem_append_right _ hc₀, v, hvd, hx, ?_⟩
+        ext l
+        simp [FiniteClause.resolvent, hc₀eq, and_comm]
     · refine Or.inl ?_
-      rw [Bool.not_not, List.filter_eq_self.2 fun l hl => by
-        simp only [ne_eq, decide_eq_true_eq]
+      rw [Bool.not_not, Finset.filter_eq_self.2 fun l hl => by
         rintro rfl
         exact hvd hl]
       exact hd
   obtain ⟨ls₂, hp₂, hnil₂, hw₂⟩ := h₂
-  obtain ⟨ls'', hp'', hup'', hdown''⟩ := hp₂.comp hψ fun c hc => List.mem_append_left _ hc
+  obtain ⟨ls'', hp'', hup'', hdown''⟩ := hp₂.comp hψ fun c hc =>
+    List.mem_append_left _ (Finset.mem_toList.2 hc)
   refine ⟨_, hp'', hup'' _ hnil₂, fun c hc => ?_⟩
   rcases List.mem_append.1 hc with hc | hc
   · exact hw₂ c (hdown'' c hc)
   rcases List.mem_append.1 hc with hc | hc
-  · exact width_le_of_mem_restrict hφ hc
+  · exact width_le_of_mem_restrict hφ (Finset.mem_toList.1 hc)
   rcases List.mem_append.1 hc with hc | hc
-  exacts [hφ c hc, hw c hc]
+  exacts [hφ c (Finset.mem_toList.1 hc), hw c hc]
 
 /-! ### Wide lines -/
 
 /-- **Double counting**: summing over literals the number of clauses of a list containing them
 gives the total width, when the literals of the clauses are among the summed literals. -/
 private theorem sum_countP_mem_eq_sum_width (U : Finset (Literal V)) :
-    ∀ F : List (Clause V), (∀ c ∈ F, ∀ l ∈ c, l ∈ U) →
-      ∑ l ∈ U, F.countP (fun c => l ∈ c) = (F.map Clause.width).sum
+    ∀ F : List (FiniteClause V), (∀ c ∈ F, ∀ l ∈ c, l ∈ U) →
+      ∑ l ∈ U, F.countP (fun c => l ∈ c) = (F.map FiniteClause.width).sum
   | [], _ => by simp
   | c :: F, hF => by
     simp only [List.countP_cons, Finset.sum_add_distrib, List.map_cons, List.sum_cons]
     rw [sum_countP_mem_eq_sum_width U F fun c hc => hF c (List.mem_cons_of_mem _ hc), add_comm]
     congr 1
-    rw [Finset.sum_boole, Nat.cast_id, Clause.width]
+    rw [Finset.sum_boole, Nat.cast_id, FiniteClause.width]
     congr 1
     ext l
-    simp only [decide_eq_true_eq, Finset.mem_filter, List.mem_toFinset, and_iff_right_iff_imp]
+    simp only [decide_eq_true_eq, Finset.mem_filter, and_iff_right_iff_imp]
     exact hF c List.mem_cons_self l
 
 /-- **Some literal lies in many wide lines.** If the lines of a nonempty list are wider than `d`
 and their literals are among the literals `U`, some literal of `U` occurs in more than a
 `d / |U|` fraction of the lines. -/
-private theorem exists_lt_countP_mem (U : Finset (Literal V)) (d : ℕ) (F : List (Clause V))
+private theorem exists_lt_countP_mem (U : Finset (Literal V)) (d : ℕ) (F : List (FiniteClause V))
     (hF : ∀ c ∈ F, ∀ l ∈ c, l ∈ U) (hwide : ∀ c ∈ F, d < c.width) (hne : F ≠ []) :
     ∃ l ∈ U, d * F.length < F.countP (fun c => l ∈ c) * U.card := by
   by_contra! h
   have hsum := sum_countP_mem_eq_sum_width U F hF
-  have hle : (F.map Clause.width).sum * U.card ≤ U.card * (d * F.length) := by
+  have hle : (F.map FiniteClause.width).sum * U.card ≤ U.card * (d * F.length) := by
     rw [← hsum, Finset.sum_mul]
     exact (Finset.sum_le_sum h).trans (by simp)
-  have hge : F.length * (d + 1) ≤ (F.map Clause.width).sum := by
-    have := List.sum_le_sum (l := F) (f := fun _ => d + 1) (g := Clause.width)
+  have hge : F.length * (d + 1) ≤ (F.map FiniteClause.width).sum := by
+    have := List.sum_le_sum (l := F) (f := fun _ => d + 1) (g := FiniteClause.width)
       fun c hc => hwide c hc
     simpa using this
   obtain ⟨c, hc⟩ := List.exists_mem_of_ne_nil F hne
   have hU : 0 < U.card := by
-    obtain ⟨l, hl⟩ := List.exists_mem_of_ne_nil c fun hnil => by
+    obtain ⟨l, hl⟩ := Finset.nonempty_iff_ne_empty.2 (show c ≠ ∅ from fun hnil => by
       have := hwide c hc
-      simp [hnil] at this
+      simp [hnil, FiniteClause.width] at this)
     exact Finset.card_pos.2 ⟨l, hF c hc l hl⟩
   have hlen : 0 < F.length := List.length_pos_iff.2 hne
   have key := (Nat.mul_le_mul_right U.card hge).trans hle
@@ -184,24 +191,24 @@ private theorem exists_lt_countP_mem (U : Finset (Literal V)) (d : ℕ) (F : Lis
   nlinarith
 
 /-- The literals of the lines of a proof from `φ` are literals of variables of `φ`. -/
-private theorem mem_literals_of_isProof {ls : List (Clause V)} (h : φ.IsProof ls) :
-    ∀ c ∈ ls, ∀ l ∈ c, l ∈ φ.vars.toFinset ×ˢ (Finset.univ : Finset Bool) :=
-  fun _ hc _ hl => Finset.mem_product.2 ⟨List.mem_toFinset.2 (h.fst_mem_vars hc hl),
+private theorem mem_literals_of_isProof {ls : List (FiniteClause V)} (h : φ.IsProof ls) :
+    ∀ c ∈ ls, ∀ l ∈ c, l ∈ φ.vars ×ˢ (Finset.univ : Finset Bool) :=
+  fun _ hc _ hl => Finset.mem_product.2 ⟨h.fst_mem_vars hc hl,
     Finset.mem_univ _⟩
 
 /-- A line of a proof from `φ` is at most twice as wide as `φ` has variables. -/
-private theorem width_le_of_isProof {ls : List (Clause V)} (h : φ.IsProof ls) {c : Clause V}
-    (hc : c ∈ ls) : c.width ≤ 2 * φ.vars.toFinset.card := by
-  calc c.width ≤ (φ.vars.toFinset ×ˢ (Finset.univ : Finset Bool)).card :=
-        Finset.card_le_card fun l hl => mem_literals_of_isProof h c hc l (List.mem_toFinset.1 hl)
-    _ = 2 * φ.vars.toFinset.card := by rw [Finset.card_product, Finset.card_univ,
+private theorem width_le_of_isProof {ls : List (FiniteClause V)} (h : φ.IsProof ls)
+    {c : FiniteClause V} (hc : c ∈ ls) : c.width ≤ 2 * φ.vars.card := by
+  calc c.width ≤ (φ.vars ×ˢ (Finset.univ : Finset Bool)).card :=
+        Finset.card_le_card fun l hl => mem_literals_of_isProof h c hc l hl
+    _ = 2 * φ.vars.card := by rw [Finset.card_product, Finset.card_univ,
         Fintype.card_bool, mul_comm]
 
 /-- The induction behind `RefutableInWidth.of_refutableInSize`, on a bound `n` on the number of
 variables. -/
 private theorem refutableInWidth_of_countP_wide (N d k : ℕ) :
-    ∀ (n : ℕ) (φ : CNF V) (ls : List (Clause V)) (b : ℕ), φ.vars.toFinset.card ≤ n → n ≤ N →
-      φ.IsProof ls → [] ∈ ls → (∀ c ∈ φ, c.width ≤ k) →
+    ∀ (n : ℕ) (φ : ClauseSet V) (ls : List (FiniteClause V)) (b : ℕ), φ.vars.card ≤ n → n ≤ N →
+      φ.IsProof ls → ∅ ∈ ls → (∀ c ∈ φ, c.width ≤ k) →
       ls.countP (fun c => d < c.width) * (2 * N - d) ^ b < (2 * N) ^ b →
       φ.RefutableInWidth (max d k + b) := by
   intro n
@@ -231,7 +238,7 @@ private theorem refutableInWidth_of_countP_wide (N d k : ℕ) :
       (fun c hc => mem_literals_of_isProof h c (List.mem_filter.1 hc).1)
       (fun c hc => by simpa using (List.mem_filter.1 hc).2) hFne
     rw [Finset.card_product, Finset.card_univ, Fintype.card_bool, hFlen] at hmany
-    have hv : v ∈ φ.vars.toFinset := (Finset.mem_product.1 hU).1
+    have hv : v ∈ φ.vars := (Finset.mem_product.1 hU).1
     -- there are wide lines, so `d < 2N`, and `b` is positive
     have hdN : d < 2 * N := by
       obtain ⟨c, hc⟩ := List.exists_mem_of_ne_nil F hFne
@@ -244,25 +251,27 @@ private theorem refutableInWidth_of_countP_wide (N d k : ℕ) :
       · simp only [pow_zero, mul_one, Nat.lt_one_iff] at hcount
         omega
       · exact ⟨b, rfl⟩
-    have hvars (γ : Bool) : (φ.restrict v γ).vars.toFinset.card ≤ n := by
+    have hvars (γ : Bool) : (φ.restrict v γ).vars.card ≤ n := by
       have := (Finset.card_le_card (vars_restrict_subset (b := γ))).trans_eq
         (Finset.card_erase_of_mem hv)
       omega
     have hk' (γ : Bool) : ∀ c ∈ φ.restrict v γ, c.width ≤ k := fun c hc =>
       width_le_of_mem_restrict hk hc
     -- the restrictions of the refutation
-    have hres (γ : Bool) : ∃ ls', (φ.restrict v γ).IsProof ls' ∧ [] ∈ ls' ∧
+    have hres (γ : Bool) : ∃ ls', (φ.restrict v γ).IsProof ls' ∧ ∅ ∈ ls' ∧
         ls'.countP (fun c => d < c.width) ≤
           ls.countP (fun c => (v, γ) ∉ c ∧ d < c.width) := by
       obtain ⟨ls', h', -, hsub, hcount'⟩ := h.restrict v γ
-      obtain ⟨c', hc', hsub'⟩ := hsub [] hnil List.not_mem_nil
-      have : c' = [] := List.eq_nil_iff_forall_not_mem.2 fun l hl => List.not_mem_nil (hsub' l hl)
+      obtain ⟨c', hc', hsub'⟩ := hsub ∅ hnil (Finset.notMem_empty _)
+      have : c' = ∅ := Finset.eq_empty_iff_forall_notMem.2 fun l hl =>
+        Finset.notMem_empty _ (hsub' l hl)
       exact ⟨ls', h', this ▸ hc', hcount' d⟩
     -- fixing the literal to be true removes the many wide lines containing it
     obtain ⟨ls₁, h₁, hnil₁, hcount₁⟩ := hres β
-    have hsplit := List.countP_and_not_add_countP_and (fun c => d < Clause.width c)
+    have hsplit := List.countP_and_not_add_countP_and (fun c => d < FiniteClause.width c)
       (fun c => (v, β) ∈ c) ls
-    have hcnt : F.countP (fun c => (v, β) ∈ c) = ls.countP (fun c => d < c.width ∧ (v, β) ∈ c) := by
+    have hcnt : F.countP (fun c => (v, β) ∈ c) =
+        ls.countP (fun c => d < c.width ∧ (v, β) ∈ c) := by
       rw [List.countP_filter]
       congr 1
       funext c
@@ -306,7 +315,7 @@ private theorem refutableInWidth_of_countP_wide (N d k : ℕ) :
 `N` variables. If `φ` has a refutation of `s` lines, and `s (2N - d) ^ b < (2N) ^ b`, then `φ` is
 refutable in width at most `max d k + b`. -/
 theorem RefutableInWidth.of_refutableInSize {k s N d b : ℕ} (hk : ∀ c ∈ φ, c.width ≤ k)
-    (hN : φ.vars.toFinset.card ≤ N) (hs : φ.RefutableInSize s)
+    (hN : φ.vars.card ≤ N) (hs : φ.RefutableInSize s)
     (hsdb : s * (2 * N - d) ^ b < (2 * N) ^ b) : φ.RefutableInWidth (max d k + b) := by
   obtain ⟨ls, h, hnil, hlen⟩ := hs
   refine refutableInWidth_of_countP_wide N d k N φ ls b hN le_rfl h hnil hk ?_
@@ -321,7 +330,7 @@ of `s` lines has a refutation of width at most `k + 2 √(2 N log s) + 2`. Equiv
 that needs width `w ≥ k + 2`, with `N > 0`, needs refutations of at least
 `exp ((w - k - 2)² / 8N)` lines. -/
 theorem exists_refutableInWidth_le_of_refutableInSize {k s N : ℕ} (hk : ∀ c ∈ φ, c.width ≤ k)
-    (hN : φ.vars.toFinset.card ≤ N) (hs : φ.RefutableInSize s) :
+    (hN : φ.vars.card ≤ N) (hs : φ.RefutableInSize s) :
     ∃ w : ℕ, φ.RefutableInWidth w ∧
       (w : ℝ) ≤ k + 2 * √(2 * N * Real.log s) + 2 := by
   obtain ⟨ls, h, hnil, hlen⟩ := hs
@@ -338,13 +347,13 @@ theorem exists_refutableInWidth_le_of_refutableInSize {k s N : ℕ} (hk : ∀ c 
     rcases htriv with hN0 | hs1
     · have := width_le_of_isProof h hc
       omega
-    · obtain rfl : ls = [[]] := by
+    · obtain rfl : ls = [∅] := by
         rcases ls with _ | ⟨c₀, _ | ⟨c₁, ls⟩⟩
         · simp at hnil
-        · simpa using hnil
+        · simpa using (List.mem_singleton.1 hnil).symm
         · simp only [List.length_cons] at hlen
           omega
-      simp_all
+      simp_all [FiniteClause.width]
   push Not at htriv
   obtain ⟨hN0, hs1⟩ := htriv
   set L := 2 * (N : ℝ) * Real.log s with hLdef
@@ -413,7 +422,7 @@ theorem exists_refutableInWidth_le_of_refutableInSize {k s N : ℕ} (hk : ∀ c 
 `N` variables. If every resolution refutation of `φ` has width at least `W ≥ k + 2`, then every
 resolution refutation of `φ` has at least `exp ((W - k - 2)² / 8N)` lines. -/
 theorem exp_le_of_refutableInSize {k N W s : ℕ} (hk : ∀ c ∈ φ, c.width ≤ k)
-    (hN : φ.vars.toFinset.card ≤ N) (hW : ∀ w, φ.RefutableInWidth w → W ≤ w)
+    (hN : φ.vars.card ≤ N) (hW : ∀ w, φ.RefutableInWidth w → W ≤ w)
     (hkW : k + 2 ≤ W) (hs : φ.RefutableInSize s) :
     Real.exp (((W : ℝ) - k - 2) ^ 2 / (8 * N)) ≤ s := by
   obtain ⟨w, hw, hwle⟩ := exists_refutableInWidth_le_of_refutableInSize hk hN hs
@@ -433,6 +442,6 @@ theorem exp_le_of_refutableInSize {k N W s : ℕ} (hk : ∀ c ∈ φ, c.width �
   rw [mul_pow, Real.sq_sqrt (by positivity)] at hsq
   nlinarith
 
-end CNF
+end ClauseSet
 
 end Cslib.Logic.PL

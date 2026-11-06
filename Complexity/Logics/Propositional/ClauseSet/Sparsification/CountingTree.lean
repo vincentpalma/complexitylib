@@ -171,8 +171,7 @@ private theorem potential_mono {α β : ClauseSet V} (h : α ⊆ β) :
     potential α ≤ potential β := by
   classical
   unfold potential
-  have := sum_sdiff h (f := fun C : Finset (Literal V) => 2 ^ C.card)
-  omega
+  exact (sum_sdiff h (f := fun C : FiniteClause V => 2 ^ C.card)) ▸ Nat.le_add_left _ _
 
 private theorem potential_union_le (α β : ClauseSet V) :
     potential (α ∪ β) ≤ potential α + potential β := by

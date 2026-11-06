@@ -8,6 +8,7 @@ module
 -- upstream: candidate
 
 public import Complexity.Logics.Propositional.Resolution.Interpolation
+public import Complexity.Logics.Propositional.Resolution.Certificate
 public import Complexity.Computability.Circuit.Boolean.Encoding
 import Complexity.Computability.Circuit.Boolean.EvaluationTime
 import Mathlib.Data.List.GetD
@@ -15,7 +16,8 @@ import Mathlib.Data.List.GetD
 /-!
 # Extracting interpolants from resolution refutations
 
-Feasible interpolation (`Cslib.Logic.PL.CNF.IsProof.exists_interpolant`) proves that a resolution
+Feasible interpolation (`Cslib.Logic.PL.ClauseSet.IsProof.exists_interpolant`) proves that a
+resolution
 refutation of `A(x, y) ∧ B(x, z)` with `s` lines has an interpolant computed by a De Morgan
 circuit with at most `4 s` gates. Refutations are propositions there, so the circuit is obtained
 by induction rather than computed. This file computes it: `Cslib.Logic.PL.CNF.interpolantCode`
@@ -23,6 +25,9 @@ reads the lines of a refutation and writes the code of the interpolant circuit a
 (`Cslib.Circuits.Circuit.code`). It follows Pudlák's construction
 [Pudlák, Theorem 1][Pudlak1997], [Krajíček, Theorem 6.1][Krajicek1997], with the justification of
 each line found by search, since the refutation records only its clauses.
+
+The input is list syntax: its mathematical proof lines are `ls.map List.toFinset`. Axiom
+and resolvent comparisons ignore literal order and repetitions.
 
 The shared variables are natural numbers; shared variable `i` is input wire `i` of a circuit with
 `n` inputs. The lines are read from the first to the last, and line `k` gets exactly four gates,
@@ -41,7 +46,7 @@ line. So the code always has `4 s` gates for `s` lines, each reading only earlie
 input wires of the shared variables it meets (`Cslib.Logic.PL.Interpolant.length_gates`,
 `Cslib.Logic.PL.Interpolant.isCodeFrom_gates`). On a refutation whose shared variables are below
 `n`, it is the code of a circuit with `4 s` gates computing an interpolant
-(`Cslib.Logic.PL.CNF.IsProof.ofCode_interpolantCode`). The proof reuses the invariant of the
+(`Cslib.Logic.PL.ClauseSet.IsProof.ofCode_interpolantCode`). The proof reuses the invariant of the
 non-computable construction (`Cslib.Logic.PL.CNF.IsInterpolantAt`). On a list without an empty
 line, the output wire is out of range and the code does not decode.
 
@@ -55,7 +60,7 @@ line, the output wire is out of range and the code does not decode.
 
 * `Cslib.Logic.PL.Interpolant.length_gates`, `Cslib.Logic.PL.Interpolant.isCodeFrom_gates`: the
   code has four gates per line and is well formed.
-* `Cslib.Logic.PL.CNF.IsProof.ofCode_interpolantCode`: on a refutation, the code decodes to a
+* `Cslib.Logic.PL.ClauseSet.IsProof.ofCode_interpolantCode`: on a refutation, the code decodes to a
   circuit with four gates per line computing an interpolant.
 
 ## References
@@ -92,11 +97,6 @@ def resolventGates (base w₁ w₂ : ℕ) : ℕ ⊕ (Y ⊕ Z) → List (Op × Li
   | .inr (.inl _) => padGate (.or, [w₁, w₂])
   | .inr (.inr _) => padGate (.and, [w₁, w₂])
 
-/-- Candidate resolution steps among `lines`: two lines, each with its position, and the variable
-of a literal of the first. -/
-def candidates (lines : List (Clause V)) : List ((Clause V × ℕ) × (Clause V × ℕ) × V) :=
-  lines.zipIdx.flatMap fun e₁ => lines.zipIdx.flatMap fun e₂ => e₁.1.map fun l => (e₁, e₂, l.1)
-
 variable [DecidableEq Y] [DecidableEq Z]
 
 /-- The four gates of a line `c` read after the lines `earlier`, on wires `n + 4k` to `n + 4k + 3`
@@ -105,11 +105,14 @@ where `k` is the number of earlier lines. A clause of `A` gets `false` and a cla
 `resolventGates`, and a line with no such step gets `false`. -/
 def lineGates (n : ℕ) (A : CNF (ℕ ⊕ Y)) (B : CNF (ℕ ⊕ Z))
     (earlier : List (Clause (ℕ ⊕ (Y ⊕ Z)))) (c : Clause (ℕ ⊕ (Y ⊕ Z))) : List (Op × List ℕ) :=
-  if c ∈ A.relabel (Sum.map id Sum.inl) then constGates false
-  else if c ∈ B.relabel (Sum.map id Sum.inr) then constGates true
-  else ((candidates earlier).find? fun t => decide ((t.2.2, true) ∈ t.1.1 ∧
-      (t.2.2, false) ∈ t.2.1.1 ∧ t.1.1.resolvent t.2.1.1 t.2.2 = c)).elim (constGates false)
-    fun t => resolventGates (n + 4 * earlier.length) (n + 4 * t.1.2 + 3) (n + 4 * t.2.1.2 + 3) t.2.2
+  if c.toFinset ∈ (A.relabel (Sum.map id Sum.inl)).toClauseSet then constGates false
+  else if c.toFinset ∈ (B.relabel (Sum.map id Sum.inr)).toClauseSet then constGates true
+  else ((Resolution.Certificate.candidates earlier).find? fun ((c₁, _), (c₂, _), v) =>
+      decide ((v, true) ∈ c₁ ∧ (v, false) ∈ c₂ ∧
+        FiniteClause.resolvent c₁.toFinset c₂.toFinset v = c.toFinset)).elim
+    (constGates false)
+    fun ((_, k₁), (_, k₂), v) =>
+      resolventGates (n + 4 * earlier.length) (n + 4 * k₁ + 3) (n + 4 * k₂ + 3) v
 
 /-- The gates of all the lines `lines`, listed from first to last, in program order. -/
 def gates (n : ℕ) (A : CNF (ℕ ⊕ Y)) (B : CNF (ℕ ⊕ Z)) (lines : List (Clause (ℕ ⊕ (Y ⊕ Z)))) :
@@ -127,7 +130,8 @@ variable {Y Z : Type*} [DecidableEq Y] [DecidableEq Z]
 
 /-- **The interpolant circuit of a refutation**, as a code (`Cslib.Circuits.Circuit.code`). The
 lines `ls` of a resolution refutation of `A.appendShared B` are listed from the last to the first,
-as in `Cslib.Logic.PL.CNF.IsProof`; shared variable `i` is input wire `i` of a circuit with `n`
+as in `Cslib.Logic.PL.ClauseSet.IsProof`; shared variable `i` is input wire `i` of a circuit with
+`n`
 inputs. The gates are those of `Cslib.Logic.PL.Interpolant.gates` on the lines from the first to
 the last, and the output is the wire of the first empty line. -/
 def CNF.interpolantCode (n : ℕ) (A : CNF (ℕ ⊕ Y)) (B : CNF (ℕ ⊕ Z))
@@ -155,29 +159,6 @@ variable {Y Z : Type*} {n : ℕ} {A : CNF (ℕ ⊕ Y)} {B : CNF (ℕ ⊕ Z)}
 @[simp] theorem length_resolventGates (base w₁ w₂ : ℕ) (v : ℕ ⊕ (Y ⊕ Z)) :
     (resolventGates base w₁ w₂ v).length = 4 := by
   rcases v with _ | _ | _ <;> rfl
-
-/-- A candidate step names two of the lines, by their positions, and the variable of a literal of
-the first. -/
-theorem mem_candidates
-    {t : (Clause (ℕ ⊕ (Y ⊕ Z)) × ℕ) × (Clause (ℕ ⊕ (Y ⊕ Z)) × ℕ) × (ℕ ⊕ (Y ⊕ Z))}
-    (ht : t ∈ candidates lines) :
-    ∃ (h₁ : t.1.2 < lines.length) (h₂ : t.2.1.2 < lines.length),
-      lines[t.1.2] = t.1.1 ∧ lines[t.2.1.2] = t.2.1.1 := by
-  obtain ⟨e₁, he₁, ht⟩ := List.mem_flatMap.1 ht
-  obtain ⟨e₂, he₂, ht⟩ := List.mem_flatMap.1 ht
-  obtain ⟨l, -, rfl⟩ := List.mem_map.1 ht
-  obtain ⟨-, h₁, hc₁⟩ := List.mem_zipIdx (x := e₁.1) (i := e₁.2) he₁
-  obtain ⟨-, h₂, hc₂⟩ := List.mem_zipIdx (x := e₂.1) (i := e₂.2) he₂
-  simp only [Nat.zero_add, Nat.sub_zero] at h₁ h₂ hc₁ hc₂
-  exact ⟨h₁, h₂, hc₁.symm, hc₂.symm⟩
-
-/-- A resolution step among the lines is a candidate. -/
-theorem mem_candidates_of_getElem {k₁ k₂ : ℕ} (h₁ : k₁ < lines.length) (h₂ : k₂ < lines.length)
-    {v : ℕ ⊕ (Y ⊕ Z)} (hv : (v, true) ∈ lines[k₁]) :
-    ((lines[k₁], k₁), (lines[k₂], k₂), v) ∈ candidates lines := by
-  refine List.mem_flatMap.2 ⟨(lines[k₁], k₁), List.mem_zipIdx_iff_getElem?.2 (by simp),
-    List.mem_flatMap.2 ⟨(lines[k₂], k₂), List.mem_zipIdx_iff_getElem?.2 (by simp),
-      List.mem_map.2 ⟨(v, true), hv, rfl⟩⟩⟩
 
 variable [DecidableEq Y] [DecidableEq Z]
 
@@ -208,12 +189,14 @@ theorem gates_append_singleton :
       List.length_singleton, Nat.mul_succ]
 
 /-- The gates of the step found for a line, if any. -/
-private theorem lineGates_eq_find (hA : c ∉ A.relabel (Sum.map id Sum.inl))
-    (hB : c ∉ B.relabel (Sum.map id Sum.inr)) :
-    lineGates n A B lines c = ((candidates lines).find? fun t => decide ((t.2.2, true) ∈ t.1.1 ∧
-      (t.2.2, false) ∈ t.2.1.1 ∧ t.1.1.resolvent t.2.1.1 t.2.2 = c)).elim (constGates false)
-    fun t => resolventGates (n + 4 * lines.length) (n + 4 * t.1.2 + 3) (n + 4 * t.2.1.2 + 3)
-      t.2.2 := by
+private theorem lineGates_eq_find (hA : c.toFinset ∉ (A.relabel (Sum.map id Sum.inl)).toClauseSet)
+    (hB : c.toFinset ∉ (B.relabel (Sum.map id Sum.inr)).toClauseSet) :
+    lineGates n A B lines c = ((Resolution.Certificate.candidates lines).find? fun t =>
+      decide ((t.2.2, true) ∈ t.1.1 ∧
+      (t.2.2, false) ∈ t.2.1.1 ∧
+        FiniteClause.resolvent t.1.1.toFinset t.2.1.1.toFinset t.2.2 = c.toFinset)).elim
+    (constGates false) fun t =>
+      resolventGates (n + 4 * lines.length) (n + 4 * t.1.2 + 3) (n + 4 * t.2.1.2 + 3) t.2.2 := by
   simp only [lineGates, hA, hB, ↓reduceIte]
 
 /-- Constant gates read no wires. -/
@@ -225,16 +208,18 @@ private theorem isCodeFrom_constGates (b : Bool) (k : ℕ) :
 below `n`. -/
 theorem isCodeFrom_lineGates (hvars : ∀ d ∈ lines, ∀ i b, (.inl i, b) ∈ d → i < n) :
     Program.IsCodeFrom signature n (4 * lines.length) (lineGates n A B lines c) := by
-  by_cases hA : c ∈ A.relabel (Sum.map id Sum.inl)
+  by_cases hA : c.toFinset ∈ (A.relabel (Sum.map id Sum.inl)).toClauseSet
   · simp only [lineGates, hA, ↓reduceIte]
     exact isCodeFrom_constGates _ _
-  by_cases hB : c ∈ B.relabel (Sum.map id Sum.inr)
+  by_cases hB : c.toFinset ∈ (B.relabel (Sum.map id Sum.inr)).toClauseSet
   · simp only [lineGates, hA, hB, ↓reduceIte]
     exact isCodeFrom_constGates _ _
   rw [lineGates_eq_find hA hB]
-  rcases hfind : List.find? _ (candidates lines) with _ | t
+  rcases hfind : List.find? _ (Resolution.Certificate.candidates lines) with _ | t
   · exact isCodeFrom_constGates _ _
-  obtain ⟨h₁, h₂, hc₁, -⟩ := mem_candidates (List.mem_of_find?_eq_some hfind)
+  obtain ⟨hp₁, hp₂⟩ := Resolution.Certificate.mem_candidates (List.mem_of_find?_eq_some hfind)
+  obtain ⟨h₁, hc₁⟩ := List.getElem?_eq_some_iff.1 hp₁
+  obtain ⟨h₂, _⟩ := List.getElem?_eq_some_iff.1 hp₂
   have htest := List.find?_some hfind
   simp only [decide_eq_true_eq] at htest
   obtain ⟨⟨c₁, k₁⟩, ⟨c₂, k₂⟩, v⟩ := t
@@ -305,45 +290,56 @@ private theorem isInterpolantAt_lineGates (hvars : ∀ d ∈ lines, ∀ i b, (.i
     {G : List (Op × List ℕ)} (hG : G.length = 4 * lines.length)
     (hcode : Program.IsCodeFrom signature n 0 (G ++ lineGates n A B lines c))
     (hgood : ∀ k (hk : k < lines.length),
-      A.IsInterpolantAt B lines[k] (wireValue n G (n + 4 * k + 3)))
-    (hc : c ∈ A.appendShared B ∨ ∃ c₁ ∈ lines, ∃ c₂ ∈ lines, ∃ v,
-      (v, true) ∈ c₁ ∧ (v, false) ∈ c₂ ∧ c = c₁.resolvent c₂ v) :
-    A.IsInterpolantAt B c
+      A.IsInterpolantAt B lines[k].toFinset (wireValue n G (n + 4 * k + 3)))
+    (hc : c.toFinset ∈ (A.appendShared B).toClauseSet ∨ ∃ c₁ ∈ lines, ∃ c₂ ∈ lines, ∃ v,
+      (v, true) ∈ c₁ ∧ (v, false) ∈ c₂ ∧
+        c.toFinset = FiniteClause.resolvent c₁.toFinset c₂.toFinset v) :
+    A.IsInterpolantAt B c.toFinset
       (wireValue n (G ++ lineGates n A B lines c) (n + 4 * lines.length + 3)) := by
   have hold {w : ℕ} (hw : w < n + 4 * lines.length) (a : ℕ → Bool) :
       wireValue n (G ++ lineGates n A B lines c) w a = wireValue n G w a :=
     wireValue_append_of_lt (by omega) a
   have hbase : n + 4 * lines.length = n + G.length := by rw [hG]
-  by_cases hA : c ∈ A.relabel (Sum.map id Sum.inl)
+  by_cases hA : c.toFinset ∈ (A.relabel (Sum.map id Sum.inl)).toClauseSet
   · have hline : lineGates n A B lines c = constGates false := by
       simp only [lineGates, hA, ↓reduceIte]
     rw [hline] at hcode ⊢
-    obtain ⟨d, hd, rfl⟩ := List.mem_map.1 hA
+    obtain ⟨e, he, heq⟩ := CNF.mem_toClauseSet.1 hA
+    obtain ⟨d, hd, rfl⟩ := List.mem_map.1 he
+    rw [← heq]
     convert CNF.isInterpolantAt_relabel_inl (B := B) hd using 1
     funext a
     rw [hbase, wireValue_block hcode (j := 3) (g := (.const false, [])) rfl]
     rfl
-  by_cases hB : c ∈ B.relabel (Sum.map id Sum.inr)
+  by_cases hB : c.toFinset ∈ (B.relabel (Sum.map id Sum.inr)).toClauseSet
   · have hline : lineGates n A B lines c = constGates true := by
       simp only [lineGates, hA, hB, ↓reduceIte]
     rw [hline] at hcode ⊢
-    obtain ⟨d, hd, rfl⟩ := List.mem_map.1 hB
+    obtain ⟨e, he, heq⟩ := CNF.mem_toClauseSet.1 hB
+    obtain ⟨d, hd, rfl⟩ := List.mem_map.1 he
+    rw [← heq]
     convert CNF.isInterpolantAt_relabel_inr (A := A) hd using 1
     funext a
     rw [hbase, wireValue_block hcode (j := 3) (g := (.const true, [])) rfl]
     rfl
   rcases hfind : List.find? (fun t => decide ((t.2.2, true) ∈ t.1.1 ∧
-      (t.2.2, false) ∈ t.2.1.1 ∧ t.1.1.resolvent t.2.1.1 t.2.2 = c)) (candidates lines) with
+      (t.2.2, false) ∈ t.2.1.1 ∧
+        FiniteClause.resolvent t.1.1.toFinset t.2.1.1.toFinset t.2.2 = c.toFinset))
+      (Resolution.Certificate.candidates lines) with
     _ | t
   · exfalso
-    rcases hc with hc | ⟨c₁, hc₁, c₂, hc₂, v, hv₁, hv₂, rfl⟩
-    · rcases List.mem_append.1 hc with hc | hc
-      exacts [hA hc, hB hc]
+    rcases hc with hc | ⟨c₁, hc₁, c₂, hc₂, v, hv₁, hv₂, heq⟩
+    · simp only [CNF.appendShared, CNF.toClauseSet, List.map_append, List.toFinset_append,
+        Finset.mem_union] at hc
+      exact hc.elim hA hB
     · obtain ⟨k₁, hk₁, rfl⟩ := List.getElem_of_mem hc₁
       obtain ⟨k₂, hk₂, rfl⟩ := List.getElem_of_mem hc₂
-      exact List.find?_eq_none.1 hfind _ (mem_candidates_of_getElem hk₁ hk₂ hv₁)
-        (by simp [hv₁, hv₂])
-  obtain ⟨h₁, h₂, hc₁, hc₂⟩ := mem_candidates (List.mem_of_find?_eq_some hfind)
+      exact List.find?_eq_none.1 hfind _
+        (Resolution.Certificate.mem_candidates_of_getElem hk₁ hk₂ hv₁)
+        (by simp [hv₁, hv₂, heq])
+  obtain ⟨hp₁, hp₂⟩ := Resolution.Certificate.mem_candidates (List.mem_of_find?_eq_some hfind)
+  obtain ⟨h₁, hc₁⟩ := List.getElem?_eq_some_iff.1 hp₁
+  obtain ⟨h₂, hc₂⟩ := List.getElem?_eq_some_iff.1 hp₂
   have htest := List.find?_some hfind
   simp only [decide_eq_true_eq] at htest
   have hline : lineGates n A B lines c = resolventGates (n + 4 * lines.length)
@@ -355,7 +351,8 @@ private theorem isInterpolantAt_lineGates (hvars : ∀ d ∈ lines, ∀ i b, (.i
   rw [hline] at hcode hw₁ hw₂ ⊢
   obtain ⟨⟨c₁, k₁⟩, ⟨c₂, k₂⟩, v⟩ := t
   dsimp only at h₁ h₂ hc₁ hc₂ htest hw₁ hw₂ ⊢
-  obtain ⟨hv₁, -, rfl⟩ := htest
+  obtain ⟨hv₁, -, heq⟩ := htest
+  rw [← heq]
   have hg₁ := hc₁ ▸ hgood k₁ h₁
   have hg₂ := hc₂ ▸ hgood k₂ h₂
   rcases v with i | j | k
@@ -397,15 +394,16 @@ private theorem isInterpolantAt_lineGates (hvars : ∀ d ∈ lines, ∀ i b, (.i
 /-- The invariant of the extraction: the value of each line is an interpolant at it. -/
 private def Invariant (n : ℕ) (A : CNF (ℕ ⊕ Y)) (B : CNF (ℕ ⊕ Z))
     (lines : List (Clause (ℕ ⊕ (Y ⊕ Z)))) : Prop :=
-  ∀ k (hk : k < lines.length), A.IsInterpolantAt B lines[k] (wireValue n (gates n A B lines)
-    (n + 4 * k + 3))
+  ∀ k (hk : k < lines.length), A.IsInterpolantAt B lines[k].toFinset
+    (wireValue n (gates n A B lines) (n + 4 * k + 3))
 
 /-- Reading a clause of the formula, or a resolvent of earlier lines, keeps the invariant. -/
 private theorem Invariant.append_singleton
     (hvars : ∀ d ∈ lines ++ [c], ∀ i b, (.inl i, b) ∈ d → i < n)
     (h : Invariant n A B lines)
-    (hc : c ∈ A.appendShared B ∨ ∃ c₁ ∈ lines, ∃ c₂ ∈ lines, ∃ v,
-      (v, true) ∈ c₁ ∧ (v, false) ∈ c₂ ∧ c = c₁.resolvent c₂ v) :
+    (hc : c.toFinset ∈ (A.appendShared B).toClauseSet ∨ ∃ c₁ ∈ lines, ∃ c₂ ∈ lines, ∃ v,
+      (v, true) ∈ c₁ ∧ (v, false) ∈ c₂ ∧
+        c.toFinset = FiniteClause.resolvent c₁.toFinset c₂.toFinset v) :
     Invariant n A B (lines ++ [c]) := by
   have hcode : Program.IsCodeFrom signature n 0 (gates n A B lines ++ lineGates n A B lines c) := by
     rw [← gates_append_singleton]
@@ -424,19 +422,22 @@ private theorem Invariant.append_singleton
 
 /-- The invariant holds along a refutation, read from the first line to the last. -/
 private theorem invariant_reverse {ls : List (Clause (ℕ ⊕ (Y ⊕ Z)))}
-    (h : (A.appendShared B).IsProof ls) (hvars : ∀ d ∈ ls, ∀ i b, (.inl i, b) ∈ d → i < n) :
+    (h : (A.appendShared B).toClauseSet.IsProof (ls.map List.toFinset))
+    (hvars : ∀ d ∈ ls, ∀ i b, (.inl i, b) ∈ d → i < n) :
     Invariant n A B ls.reverse := by
-  induction h with
+  induction ls with
   | nil => intro k hk; simp at hk
-  | @mem ls c _ hc ih =>
+  | cons c ls ih =>
+    obtain ⟨htail, hc⟩ := ClauseSet.IsProof.cons_iff.1 h
     rw [List.reverse_cons]
-    exact (ih fun d hd => hvars d (List.mem_cons_of_mem _ hd)).append_singleton
-      (fun d hd => hvars d (by simpa [or_comm] using hd)) (Or.inl hc)
-  | @resolvent ls c₁ c₂ v _ h₁ h₂ hv₁ hv₂ ih =>
-    rw [List.reverse_cons]
-    exact (ih fun d hd => hvars d (List.mem_cons_of_mem _ hd)).append_singleton
+    apply (ih htail (fun d hd => hvars d (List.mem_cons_of_mem _ hd))).append_singleton
       (fun d hd => hvars d (by simpa [or_comm] using hd))
-      (Or.inr ⟨c₁, List.mem_reverse.2 h₁, c₂, List.mem_reverse.2 h₂, v, hv₁, hv₂, rfl⟩)
+    rcases hc with hc | ⟨c₁, hc₁, c₂, hc₂, v, hv₁, hv₂, heq⟩
+    · exact Or.inl hc
+    · obtain ⟨e₁, he₁, rfl⟩ := List.mem_map.1 hc₁
+      obtain ⟨e₂, he₂, rfl⟩ := List.mem_map.1 hc₂
+      exact Or.inr ⟨e₁, List.mem_reverse.2 he₁, e₂, List.mem_reverse.2 he₂, v,
+        List.mem_toFinset.1 hv₁, List.mem_toFinset.1 hv₂, heq⟩
 
 end Interpolant
 
@@ -444,12 +445,14 @@ variable {Y Z : Type*} [DecidableEq Y] [DecidableEq Z]
 
 /-- If the shared variables of `A` and `B` are below `n`, so are those of every line of a
 refutation of `A.appendShared B`. -/
-theorem CNF.IsProof.shared_lt {n : ℕ} {A : CNF (ℕ ⊕ Y)} {B : CNF (ℕ ⊕ Z)}
-    {ls : List (Clause (ℕ ⊕ (Y ⊕ Z)))} (h : (A.appendShared B).IsProof ls)
+theorem ClauseSet.IsProof.shared_lt {n : ℕ} {A : CNF (ℕ ⊕ Y)} {B : CNF (ℕ ⊕ Z)}
+    {ls : List (FiniteClause (ℕ ⊕ (Y ⊕ Z)))} (h : (A.appendShared B).toClauseSet.IsProof ls)
     (hA : ∀ d ∈ A, ∀ i b, (.inl i, b) ∈ d → i < n) (hB : ∀ d ∈ B, ∀ i b, (.inl i, b) ∈ d → i < n) :
     ∀ d ∈ ls, ∀ i b, (.inl i, b) ∈ d → i < n := by
   intro d hd i b hl
-  obtain ⟨l, hl', hli⟩ := List.mem_map.1 (h.fst_mem_vars hd hl)
+  have hmem := h.fst_mem_vars hd hl
+  rw [CNF.vars_toClauseSet, List.mem_toFinset] at hmem
+  obtain ⟨l, hl', hli⟩ := List.mem_map.1 hmem
   obtain ⟨e, he, hle⟩ := List.mem_flatten.1 hl'
   rcases List.mem_append.1 he with he | he <;> obtain ⟨d', hd', rfl⟩ := List.mem_map.1 he <;>
     obtain ⟨l', hl'', rfl⟩ := List.mem_map.1 hle <;> rcases l' with ⟨_ | _, b'⟩ <;>
@@ -462,13 +465,15 @@ theorem CNF.IsProof.shared_lt {n : ℕ} {A : CNF (ℕ ⊕ Y)} {B : CNF (ℕ ⊕ 
 code of a De Morgan circuit with `n` inputs and four gates per line of the refutation, computing an
 interpolant of `A` and `B` [Pudlák, Theorem 1][Pudlak1997], [Krajíček, Theorem 6.1][Krajicek1997].
 -/
-theorem CNF.IsProof.ofCode_interpolantCode {n : ℕ} {A : CNF (ℕ ⊕ Y)} {B : CNF (ℕ ⊕ Z)}
-    {ls : List (Clause (ℕ ⊕ (Y ⊕ Z)))} (h : (A.appendShared B).IsProof ls) (hnil : [] ∈ ls)
+theorem ClauseSet.IsProof.ofCode_interpolantCode {n : ℕ} {A : CNF (ℕ ⊕ Y)} {B : CNF (ℕ ⊕ Z)}
+    {ls : List (Clause (ℕ ⊕ (Y ⊕ Z)))}
+    (h : (A.appendShared B).toClauseSet.IsProof (ls.map List.toFinset)) (hnil : [] ∈ ls)
     (hA : ∀ d ∈ A, ∀ i b, (.inl i, b) ∈ d → i < n) (hB : ∀ d ∈ B, ∀ i b, (.inl i, b) ∈ d → i < n) :
     ∃ C : Circuit signature n 1, Circuit.ofCode n 1 (CNF.interpolantCode n A B ls) = some C ∧
       C.size = 4 * ls.length ∧
       A.IsInterpolant B fun a => C.eval interpretation (fun i => a i) 0 := by
-  have hvars := h.shared_lt hA hB
+  have hvars : ∀ d ∈ ls, ∀ i b, (.inl i, b) ∈ d → i < n := fun d hd i b hl =>
+    h.shared_lt hA hB d.toFinset (List.mem_map_of_mem hd) i b (List.mem_toFinset.2 hl)
   have hvars' : ∀ d ∈ ls.reverse, ∀ i b, (.inl i, b) ∈ d → i < n :=
     fun d hd => hvars d (List.mem_reverse.1 hd)
   set k := (ls.reverse.map List.isEmpty).idxOf true with hk_def

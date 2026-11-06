@@ -33,32 +33,33 @@ namespace ComplexityTests.Abstracts.ResolutionAbstract
 /-! ## CNF formulas and resolution certificates
 
 A literal is a variable paired with its Boolean polarity. A clause is a disjunction of its
-literals, and a formula is a conjunction of clauses. Lists preserve occurrences and order.
+literals, represented by a finite set so that order and repetition are immaterial.
+Input formulas retain list syntax; a resolution proof uses their finite sets of literals.
 -/
 
 /-- A clause over variables `V`. -/
-abbrev Clause (V : Type) := List (V × Bool)
+abbrev Clause (V : Type) := Finset (V × Bool)
 
-/-- A formula in conjunctive normal form. -/
-abbrev CNF (V : Type) := List (Clause V)
+/-- A formula in conjunctive normal form, as list syntax for its input clauses. -/
+abbrev CNF (V : Type) := List (List (V × Bool))
 
 /-- An assignment satisfies every clause when each clause contains a matching literal. -/
 def Satisfiable {V : Type} (φ : CNF V) : Prop :=
   ∃ σ : V → Bool, ∀ c ∈ φ, ∃ l ∈ c, σ l.1 = l.2
 
 /-- A resolution proof is listed last line first. A new line is an input clause or is obtained
-from two earlier lines by deleting all positive occurrences of a pivot in the first and all
-negative occurrences in the second, then concatenating. Both pivot occurrences are required.
-There is no weakening rule. -/
+from two earlier lines by erasing the positive pivot from the first and the negative pivot
+from the second, then taking their union. Both pivot literals are required. Input clauses are
+converted to finite sets; there is no weakening rule. -/
 def IsProof {V : Type} [DecidableEq V] (φ : CNF V) : List (Clause V) → Prop
   | [] => True
-  | c :: ls => IsProof φ ls ∧ (c ∈ φ ∨ ∃ v c₁ c₂,
+  | c :: ls => IsProof φ ls ∧ (c ∈ (φ.map List.toFinset).toFinset ∨ ∃ v c₁ c₂,
       c₁ ∈ ls ∧ c₂ ∈ ls ∧ (v, true) ∈ c₁ ∧ (v, false) ∈ c₂ ∧
-      c = c₁.filter (· ≠ (v, true)) ++ c₂.filter (· ≠ (v, false)))
+      c = c₁.erase (v, true) ∪ c₂.erase (v, false))
 
 /-- A refutation derives the empty clause using at most `s` lines. -/
 def RefutableInSize {V : Type} [DecidableEq V] (φ : CNF V) (s : ℕ) : Prop :=
-  ∃ ls, IsProof φ ls ∧ [] ∈ ls ∧ ls.length ≤ s
+  ∃ ls, IsProof φ ls ∧ ∅ ∈ ls ∧ ls.length ≤ s
 
 /-! ## The non-onto pigeonhole formula
 

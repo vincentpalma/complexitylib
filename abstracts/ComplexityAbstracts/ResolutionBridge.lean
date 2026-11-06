@@ -12,23 +12,25 @@ import Complexity.Logics.Propositional.Resolution.Pigeonhole
 /-!
 # Bridge for Haken's resolution formal abstract
 
-The elementary recursive proof predicate is equivalent to the library's inductive list proof,
-with no weakening rule and with input lines counted. The pigeonhole formula is definitionally
-unchanged. The bound concerns proof size, not solver runtime.
+The elementary recursive proof predicate is equivalent to the library's inductive proof on finite
+clauses, with no weakening rule and with input lines counted. The input pigeonhole formula is
+definitionally unchanged and enters the calculus through `CNF.toClauseSet`. The bound concerns
+proof size, not solver runtime.
 -/
 
 namespace ComplexityTests.Abstracts.ResolutionBridge
 
 /-- A resolution proof, listed with the last line first. -/
 def IsProof {V : Type} [DecidableEq V] (φ : List (List (V × Bool))) :
-    List (List (V × Bool)) → Prop
+    List (Finset (V × Bool)) → Prop
   | [] => True
-  | c :: ls => IsProof φ ls ∧ (c ∈ φ ∨ ∃ v c₁ c₂,
+  | c :: ls => IsProof φ ls ∧ (c ∈ (φ.map List.toFinset).toFinset ∨ ∃ v c₁ c₂,
       c₁ ∈ ls ∧ c₂ ∈ ls ∧ (v, true) ∈ c₁ ∧ (v, false) ∈ c₂ ∧
-      c = c₁.filter (· ≠ (v, true)) ++ c₂.filter (· ≠ (v, false)))
+      c = c₁.erase (v, true) ∪ c₂.erase (v, false))
 
-theorem isProof_iff {V : Type} [DecidableEq V] (φ ls : List (List (V × Bool))) :
-    IsProof φ ls ↔ Cslib.Logic.PL.CNF.IsProof φ ls := by
+theorem isProof_iff {V : Type} [DecidableEq V] (φ : List (List (V × Bool)))
+    (ls : List (Finset (V × Bool))) :
+    IsProof φ ls ↔ Cslib.Logic.PL.ClauseSet.IsProof (Cslib.Logic.PL.CNF.toClauseSet φ) ls := by
   induction ls with
   | nil => exact ⟨fun _ => .nil, fun _ => trivial⟩
   | cons c ls ih =>
@@ -44,11 +46,12 @@ theorem isProof_iff {V : Type} [DecidableEq V] (φ ls : List (List (V × Bool)))
 
 /-- Refutability within a number of lines. -/
 def RefutableInSize {V : Type} [DecidableEq V] (φ : List (List (V × Bool))) (s : ℕ) : Prop :=
-  ∃ ls, IsProof φ ls ∧ [] ∈ ls ∧ ls.length ≤ s
+  ∃ ls, IsProof φ ls ∧ ∅ ∈ ls ∧ ls.length ≤ s
 
 theorem refutableInSize_iff {V : Type} [DecidableEq V] (φ : List (List (V × Bool))) (s : ℕ) :
-    RefutableInSize φ s ↔ Cslib.Logic.PL.CNF.RefutableInSize φ s := by
-  simp only [RefutableInSize, Cslib.Logic.PL.CNF.RefutableInSize, isProof_iff]
+    RefutableInSize φ s ↔
+      Cslib.Logic.PL.ClauseSet.RefutableInSize (Cslib.Logic.PL.CNF.toClauseSet φ) s := by
+  simp only [RefutableInSize, Cslib.Logic.PL.ClauseSet.RefutableInSize, isProof_iff]
 
 /-- Satisfiability stated using ordinary quantifiers. -/
 def Satisfiable {V : Type} (φ : List (List (V × Bool))) : Prop :=
@@ -76,15 +79,15 @@ theorem haken {n s : ℕ} (hs : RefutableInSize (pigeonhole (n + 1) n) s) :
 
 /-- Equational presentation of the recursive proof predicate, for a fresh abstract definition. -/
 def ProofRules {V : Type} [DecidableEq V]
-    (P : List (List (V × Bool)) → List (List (V × Bool)) → Prop) : Prop :=
+    (P : List (List (V × Bool)) → List (Finset (V × Bool)) → Prop) : Prop :=
   (∀ φ, P φ [] ↔ True) ∧ ∀ φ c ls, P φ (c :: ls) ↔
-    P φ ls ∧ (c ∈ φ ∨ ∃ v c₁ c₂,
+    P φ ls ∧ (c ∈ (φ.map List.toFinset).toFinset ∨ ∃ v c₁ c₂,
       c₁ ∈ ls ∧ c₂ ∈ ls ∧ (v, true) ∈ c₁ ∧ (v, false) ∈ c₂ ∧
-      c = c₁.filter (· ≠ (v, true)) ++ c₂.filter (· ≠ (v, false)))
+      c = c₁.erase (v, true) ∪ c₂.erase (v, false))
 
 theorem proof_iff_of_rules {V : Type} [DecidableEq V]
-    (P : List (List (V × Bool)) → List (List (V × Bool)) → Prop) (hP : ProofRules P)
-    (φ ls : List (List (V × Bool))) : P φ ls ↔ IsProof φ ls := by
+    (P : List (List (V × Bool)) → List (Finset (V × Bool)) → Prop) (hP : ProofRules P)
+    (φ : List (List (V × Bool))) (ls : List (Finset (V × Bool))) : P φ ls ↔ IsProof φ ls := by
   induction ls with
   | nil => exact hP.1 φ
   | cons c ls ih => rw [hP.2 φ c ls, IsProof, ih]
@@ -92,18 +95,18 @@ theorem proof_iff_of_rules {V : Type} [DecidableEq V]
 /-- Transfer Haken's bound through the elementary recursive equations. -/
 theorem haken_of_rules {n s : ℕ}
     (P : List (List ((Fin (n + 1) × Fin n) × Bool)) →
-      List (List ((Fin (n + 1) × Fin n) × Bool)) → Prop) (hP : ProofRules P)
-    (hs : ∃ ls, P (pigeonhole (n + 1) n) ls ∧ [] ∈ ls ∧ ls.length ≤ s) :
+      List (Finset ((Fin (n + 1) × Fin n) × Bool)) → Prop) (hP : ProofRules P)
+    (hs : ∃ ls, P (pigeonhole (n + 1) n) ls ∧ ∅ ∈ ls ∧ ls.length ≤ s) :
     2 ^ (n / 24) ≤ s := by
   apply haken
   simpa only [RefutableInSize, proof_iff_of_rules P hP] using hs
 
 -- The proof predicate is inhabited at the input-empty-clause and zero-hole boundaries.
 example : RefutableInSize ([[]] : List (List (ℕ × Bool))) 1 :=
-  ⟨[[]], ⟨trivial, Or.inl (by simp)⟩, by simp, by decide⟩
+  ⟨[∅], ⟨trivial, Or.inl (by simp)⟩, by simp, by decide⟩
 
 example : RefutableInSize (pigeonhole 1 0) 1 := by
   change RefutableInSize ([[]] : List (List ((Fin 1 × Fin 0) × Bool))) 1
-  exact ⟨[[]], ⟨trivial, Or.inl (by simp)⟩, by simp, by decide⟩
+  exact ⟨[∅], ⟨trivial, Or.inl (by simp)⟩, by simp, by decide⟩
 
 end ComplexityTests.Abstracts.ResolutionBridge

@@ -25,8 +25,8 @@ and `f a = true` that `B(a, ·)` is. An interpolant exists exactly when `A ∧ B
 resolution refutation of `A ∧ B` yields an interpolant computed by a circuit whose size is linear
 in the number of lines of the refutation
 [Krajíček, Theorem 6.1][Krajicek1997], [Pudlák, Theorem 1][Pudlak1997]
-(`Cslib.Logic.PL.CNF.IsProof.exists_interpolant`,
-`Cslib.Logic.PL.CNF.RefutableInSize.exists_interpolant`).
+(`Cslib.Logic.PL.ClauseSet.IsProof.exists_interpolant`,
+`Cslib.Logic.PL.ClauseSet.RefutableInSize.exists_interpolant`).
 
 The circuit follows the refutation line by line, as in Pudlák's construction. A clause of `A` gets
 the constant `false` and a clause of `B` the constant `true`. The resolvent of `c₁ ∋ v` and
@@ -44,15 +44,17 @@ number of variables.
 can be replaced by the monotone gate `(x ∨ g₁) ∧ g₂` [Pudlák, Theorem 2 and its proof][Pudlak1997];
 if they occur only negatively in `B`, by the dual gate `(x ∧ g₂) ∨ g₁`. The interpolant is then
 computed by a monotone circuit with at most two gates per line
-(`Cslib.Logic.PL.CNF.IsProof.exists_monotone_interpolant_of_positive`,
-`Cslib.Logic.PL.CNF.IsProof.exists_monotone_interpolant_of_negative`). For the first polarity,
+(`Cslib.Logic.PL.ClauseSet.IsProof.exists_monotone_interpolant_of_positive`,
+`Cslib.Logic.PL.ClauseSet.IsProof.exists_monotone_interpolant_of_negative`). For the first polarity,
 `A` sees only the positive shared literals of a line, which loses nothing on its own clauses. The
 monotone gate differs from the selector only at `x = false`, `g₁ = true`, `g₂ = false`; there `A`
 sees `c₂` without its literal `¬x`, and so sees the resolvent. The second polarity is dual. A
 lower bound on monotone circuits separating the two sets then bounds the size of resolution
 refutations from below.
 
-Line-based refutations (`Cslib.Logic.PL.CNF.IsProof`) are propositions, so the circuit is
+The formulas `A` and `B` retain CNF list syntax; proof lines are finite clauses and the
+refutation is from `(A.appendShared B).toClauseSet`. Line-based refutations
+(`Cslib.Logic.PL.ClauseSet.IsProof`) are propositions, so the circuit is
 obtained by induction on the refutation rather than computed from it; the existence statements
 here certify its size and correctness, not the running time of extracting it. The invariant of the
 construction is public (`Cslib.Logic.PL.CNF.IsInterpolantAt`), for an arbitrary type of shared
@@ -80,14 +82,14 @@ the circuits from the lines of a refutation, and
 * `Cslib.Logic.PL.CNF.IsInterpolant.not_satisfiable`,
   `Cslib.Logic.PL.CNF.exists_isInterpolant_iff`: an interpolant exists exactly when the
   conjunction is unsatisfiable.
-* `Cslib.Logic.PL.CNF.IsProof.exists_interpolant`,
-  `Cslib.Logic.PL.CNF.RefutableInSize.exists_interpolant`: **feasible interpolation**, a
+* `Cslib.Logic.PL.ClauseSet.IsProof.exists_interpolant`,
+  `Cslib.Logic.PL.ClauseSet.RefutableInSize.exists_interpolant`: **feasible interpolation**, a
   refutation with `s` lines gives an interpolant computed by a De Morgan circuit with at most
   `4 s` gates.
-* `Cslib.Logic.PL.CNF.IsProof.exists_monotone_interpolant_of_positive`,
-  `Cslib.Logic.PL.CNF.IsProof.exists_monotone_interpolant_of_negative`,
-  `Cslib.Logic.PL.CNF.RefutableInSize.exists_monotone_interpolant_of_positive`,
-  `Cslib.Logic.PL.CNF.RefutableInSize.exists_monotone_interpolant_of_negative`: **monotone
+* `Cslib.Logic.PL.ClauseSet.IsProof.exists_monotone_interpolant_of_positive`,
+  `Cslib.Logic.PL.ClauseSet.IsProof.exists_monotone_interpolant_of_negative`,
+  `Cslib.Logic.PL.ClauseSet.RefutableInSize.exists_monotone_interpolant_of_positive`,
+  `Cslib.Logic.PL.ClauseSet.RefutableInSize.exists_monotone_interpolant_of_negative`: **monotone
   feasible interpolation**, when the shared variables occur only positively in `A` or only
   negatively in `B`: a refutation with `s` lines gives an interpolant computed by a monotone
   circuit with at most `2 s` gates.
@@ -172,8 +174,9 @@ variable {V : Type*} {σ : Signature} {U : Type*} {I : Interpretation σ U} {n :
 
 /-- Adding a line related to `f` to lines related to functions in `T` gives lines related to
 functions in `T ∪ {f}`. -/
-private theorem forall_mem_cons_union {Good : Clause V → ((Fin n → U) → U) → Prop}
-    {ls : List (Clause V)} {c : Clause V} {T : Set ((Fin n → U) → U)} {f : (Fin n → U) → U}
+private theorem forall_mem_cons_union {Good : FiniteClause V → ((Fin n → U) → U) → Prop}
+    {ls : List (FiniteClause V)} {c : FiniteClause V} {T : Set ((Fin n → U) → U)}
+    {f : (Fin n → U) → U}
     (hls : ∀ e ∈ ls, ∃ g ∈ T, Good e g) (hc : Good c f) :
     ∀ e ∈ c :: ls, ∃ g ∈ T ∪ {f}, Good e g := by
   intro e he
@@ -189,10 +192,10 @@ of `φ` is related to a function synthesized with `cost` gates, and whenever two
 to `f₁` and `f₂`, their resolvent is related to a function synthesized from `f₁` and `f₂` with
 `cost` further gates. Then the lines of a proof from `φ` are related to functions synthesized
 together with `cost` gates per line. -/
-private theorem IsProof.exists_synthesis {φ : CNF V} {ls : List (Clause V)}
-    (Good : Clause V → ((Fin n → U) → U) → Prop) {cost : ℕ}
+private theorem ClauseSet.IsProof.exists_synthesis {φ : ClauseSet V} {ls : List (FiniteClause V)}
+    (Good : FiniteClause V → ((Fin n → U) → U) → Prop) {cost : ℕ}
     (hmem : ∀ c ∈ φ, ∃ f, Good c f ∧ Synthesis I (inputs n) {f} cost)
-    (hres : ∀ (c₁ c₂ : Clause V) (v : V) (f₁ f₂ : (Fin n → U) → U), (v, true) ∈ c₁ →
+    (hres : ∀ (c₁ c₂ : FiniteClause V) (v : V) (f₁ f₂ : (Fin n → U) → U), (v, true) ∈ c₁ →
       (v, false) ∈ c₂ → Good c₁ f₁ → Good c₂ f₂ →
         ∃ f, Good (c₁.resolvent c₂ v) f ∧ Synthesis I (inputs n ∪ {f₁, f₂}) {f} cost)
     (h : φ.IsProof ls) :
@@ -219,17 +222,17 @@ private theorem IsProof.exists_synthesis {φ : CNF V} {ls : List (Clause V)}
 
 /-- Proof-guided synthesis of a circuit for a function related to the empty clause, when the
 proof is a refutation. -/
-private theorem IsProof.exists_circuit {φ : CNF V} {ls : List (Clause V)}
-    (Good : Clause V → ((Fin n → U) → U) → Prop) {cost : ℕ}
+private theorem ClauseSet.IsProof.exists_circuit {φ : ClauseSet V} {ls : List (FiniteClause V)}
+    (Good : FiniteClause V → ((Fin n → U) → U) → Prop) {cost : ℕ}
     (hmem : ∀ c ∈ φ, ∃ f, Good c f ∧ Synthesis I (inputs n) {f} cost)
-    (hres : ∀ (c₁ c₂ : Clause V) (v : V) (f₁ f₂ : (Fin n → U) → U), (v, true) ∈ c₁ →
+    (hres : ∀ (c₁ c₂ : FiniteClause V) (v : V) (f₁ f₂ : (Fin n → U) → U), (v, true) ∈ c₁ →
       (v, false) ∈ c₂ → Good c₁ f₁ → Good c₂ f₂ →
         ∃ f, Good (c₁.resolvent c₂ v) f ∧ Synthesis I (inputs n ∪ {f₁, f₂}) {f} cost)
-    (h : φ.IsProof ls) (hnil : [] ∈ ls) :
-    ∃ f, Good [] f ∧ ∃ C : Circuit σ n 1, C.Computes I (single f) ∧
+    (h : φ.IsProof ls) (hnil : ∅ ∈ ls) :
+    ∃ f, Good ∅ f ∧ ∃ C : Circuit σ n 1, C.Computes I (single f) ∧
       C.size ≤ cost * ls.length := by
-  obtain ⟨T, hT, hgood⟩ := IsProof.exists_synthesis Good hmem hres h
-  obtain ⟨f, hf, hgf⟩ := hgood [] hnil
+  obtain ⟨T, hT, hgood⟩ := ClauseSet.IsProof.exists_synthesis Good hmem hres h
+  obtain ⟨f, hf, hgf⟩ := hgood ∅ hnil
   exact ⟨f, hgf, (hT.mono Set.Subset.rfl (Set.singleton_subset_iff.2 hf) le_rfl).exists_circuit⟩
 
 end Synthesis
@@ -241,41 +244,42 @@ section Satisfies
 variable {V : Type*}
 
 /-- A partial assignment satisfies a clause when it makes one of its literals true. -/
-private def Satisfies (ρ : V → Option Bool) (c : Clause V) : Prop :=
+private def Satisfies (ρ : V → Option Bool) (c : FiniteClause V) : Prop :=
   ∃ l ∈ c, ρ l.1 = some l.2
 
 /-- Nothing satisfies the empty clause. -/
-private theorem not_satisfies_nil (ρ : V → Option Bool) : ¬ Satisfies ρ [] := by
+private theorem not_satisfies_empty (ρ : V → Option Bool) : ¬ Satisfies ρ ∅ := by
   simp [Satisfies]
 
 /-- A clause relabelled along `g` is satisfied by `ρ` if one of its literals `l` has
 `ρ (g l.1) = some l.2`. -/
-private theorem satisfies_relabel {W : Type*} {ρ : V → Option Bool} {g : W → V} {c : Clause W}
-    {l : Literal W} (hl : l ∈ c) (hρ : ρ (g l.1) = some l.2) : Satisfies ρ (c.relabel g) :=
-  ⟨(g l.1, l.2), List.mem_map_of_mem (f := Prod.map g id) hl, hρ⟩
+private theorem satisfies_relabel [DecidableEq V] {W : Type*} {ρ : V → Option Bool}
+    {g : W → V} {c : Clause W}
+    {l : Literal W} (hl : l ∈ c) (hρ : ρ (g l.1) = some l.2) : Satisfies ρ (c.relabel g).toFinset :=
+  ⟨(g l.1, l.2), List.mem_toFinset.2 (List.mem_map_of_mem (f := Prod.map g id) hl), hρ⟩
 
 variable [DecidableEq V]
 
 /-- A partial assignment satisfying the first premise satisfies the resolvent, unless it satisfies
 the first premise only through the resolved literal. -/
-private theorem Satisfies.resolvent_left {ρ : V → Option Bool} {c₁ c₂ : Clause V} {v : V}
+private theorem Satisfies.resolvent_left {ρ : V → Option Bool} {c₁ c₂ : FiniteClause V} {v : V}
     (h : Satisfies ρ c₁) (hv : ρ v ≠ some true) : Satisfies ρ (c₁.resolvent c₂ v) := by
   obtain ⟨l, hl, hρ⟩ := h
-  refine ⟨l, Clause.mem_resolvent.2 (Or.inl ⟨hl, ?_⟩), hρ⟩
+  refine ⟨l, FiniteClause.mem_resolvent.2 (Or.inl ⟨hl, ?_⟩), hρ⟩
   rintro rfl
   exact hv hρ
 
 /-- A partial assignment satisfying the second premise satisfies the resolvent, unless it satisfies
 the second premise only through the resolved literal. -/
-private theorem Satisfies.resolvent_right {ρ : V → Option Bool} {c₁ c₂ : Clause V} {v : V}
+private theorem Satisfies.resolvent_right {ρ : V → Option Bool} {c₁ c₂ : FiniteClause V} {v : V}
     (h : Satisfies ρ c₂) (hv : ρ v ≠ some false) : Satisfies ρ (c₁.resolvent c₂ v) := by
   obtain ⟨l, hl, hρ⟩ := h
-  refine ⟨l, Clause.mem_resolvent.2 (Or.inr ⟨hl, ?_⟩), hρ⟩
+  refine ⟨l, FiniteClause.mem_resolvent.2 (Or.inr ⟨hl, ?_⟩), hρ⟩
   rintro rfl
   exact hv hρ
 
 /-- A partial assignment satisfying both premises satisfies the resolvent. -/
-private theorem Satisfies.resolvent {ρ : V → Option Bool} {c₁ c₂ : Clause V} {v : V}
+private theorem Satisfies.resolvent {ρ : V → Option Bool} {c₁ c₂ : FiniteClause V} {v : V}
     (h₁ : Satisfies ρ c₁) (h₂ : Satisfies ρ c₂) : Satisfies ρ (c₁.resolvent c₂ v) := by
   by_cases hv : ρ v = some true
   · exact h₂.resolvent_right (by simp [hv])
@@ -317,29 +321,31 @@ assignments `ρA` and `ρB` through which each side sees the line: if `f a = fal
 `ρB a z` satisfy `c`. -/
 private def Good (ρA : (X → Bool) → (Y → Bool) → X ⊕ (Y ⊕ Z) → Option Bool)
     (ρB : (X → Bool) → (Z → Bool) → X ⊕ (Y ⊕ Z) → Option Bool)
-    (A : CNF (X ⊕ Y)) (B : CNF (X ⊕ Z)) (c : Clause (X ⊕ (Y ⊕ Z)))
+    (A : CNF (X ⊕ Y)) (B : CNF (X ⊕ Z)) (c : FiniteClause (X ⊕ (Y ⊕ Z)))
     (f : (X → Bool) → Bool) : Prop :=
   (∀ a y, A.eval (Sum.elim a y) = true → f a = false → Satisfies (ρA a y) c) ∧
     ∀ a z, B.eval (Sum.elim a z) = true → f a = true → Satisfies (ρB a z) c
 
-variable {ρA : (X → Bool) → (Y → Bool) → X ⊕ (Y ⊕ Z) → Option Bool}
+variable [DecidableEq X] [DecidableEq Y] [DecidableEq Z]
+  {ρA : (X → Bool) → (Y → Bool) → X ⊕ (Y ⊕ Z) → Option Bool}
   {ρB : (X → Bool) → (Z → Bool) → X ⊕ (Y ⊕ Z) → Option Bool}
   {A : CNF (X ⊕ Y)} {B : CNF (X ⊕ Z)}
 
+omit [DecidableEq X] [DecidableEq Y] [DecidableEq Z] in
 /-- At the empty clause the invariant is the interpolation property. -/
-private theorem isInterpolant_of_good {f : (X → Bool) → Bool} (h : Good ρA ρB A B [] f) :
+private theorem isInterpolant_of_good {f : (X → Bool) → Bool} (h : Good ρA ρB A B ∅ f) :
     A.IsInterpolant B f := by
   refine ⟨fun a y hA => ?_, fun a z hB => ?_⟩
   · by_contra hf
-    exact not_satisfies_nil _ (h.1 a y hA (Bool.eq_false_iff.2 hf))
+    exact not_satisfies_empty _ (h.1 a y hA (Bool.eq_false_iff.2 hf))
   · by_contra hf
-    exact not_satisfies_nil _ (h.2 a z hB (Bool.eq_true_of_not_eq_false hf))
+    exact not_satisfies_empty _ (h.2 a z hB (Bool.eq_true_of_not_eq_false hf))
 
 /-- A clause of `A` gets the constant `false`, if `ρA a y` satisfies every literal of it true at
 `(a, y)`. -/
 private theorem good_false {d : Clause (X ⊕ Y)} (hd : d ∈ A)
     (hρ : ∀ a y, ∀ l ∈ d, Sum.elim a y l.1 = l.2 → ρA a y (Sum.map id Sum.inl l.1) = some l.2) :
-    Good ρA ρB A B (d.relabel (Sum.map id Sum.inl)) fun _ => false := by
+    Good ρA ρB A B (d.relabel (Sum.map id Sum.inl)).toFinset fun _ => false := by
   refine ⟨fun a y hA _ => ?_, fun _ _ _ hf => Bool.noConfusion hf⟩
   obtain ⟨l, hl, he⟩ := (Clause.eval_eq_true_iff _ _).1 ((CNF.eval_eq_true_iff _ _).1 hA d hd)
   exact satisfies_relabel hl (hρ a y l hl he)
@@ -348,7 +354,7 @@ private theorem good_false {d : Clause (X ⊕ Y)} (hd : d ∈ A)
 `(a, z)`. -/
 private theorem good_true {d : Clause (X ⊕ Z)} (hd : d ∈ B)
     (hρ : ∀ a z, ∀ l ∈ d, Sum.elim a z l.1 = l.2 → ρB a z (Sum.map id Sum.inr l.1) = some l.2) :
-    Good ρA ρB A B (d.relabel (Sum.map id Sum.inr)) fun _ => true := by
+    Good ρA ρB A B (d.relabel (Sum.map id Sum.inr)).toFinset fun _ => true := by
   refine ⟨fun _ _ _ hf => Bool.noConfusion hf, fun a z hB _ => ?_⟩
   obtain ⟨l, hl, he⟩ := (Clause.eval_eq_true_iff _ _).1 ((CNF.eval_eq_true_iff _ _).1 hB d hd)
   exact satisfies_relabel hl (hρ a z l hl he)
@@ -366,24 +372,25 @@ clauses of `B` the interpolant `true`; resolution steps combine interpolants at 
 (`Cslib.Logic.PL.CNF.IsInterpolantAt.resolvent_inl` and its neighbours); and an interpolant at the
 empty clause is an interpolant of `A` and `B` (`Cslib.Logic.PL.CNF.IsInterpolantAt.isInterpolant`).
 -/
-def CNF.IsInterpolantAt (A : CNF (X ⊕ Y)) (B : CNF (X ⊕ Z)) (c : Clause (X ⊕ (Y ⊕ Z)))
+def CNF.IsInterpolantAt (A : CNF (X ⊕ Y)) (B : CNF (X ⊕ Z)) (c : FiniteClause (X ⊕ (Y ⊕ Z)))
     (f : (X → Bool) → Bool) : Prop :=
   Good leftPart rightPart A B c f
 
+omit [DecidableEq X] [DecidableEq Y] [DecidableEq Z] in
 /-- An interpolant at the empty clause is an interpolant of `A` and `B`. -/
 theorem CNF.IsInterpolantAt.isInterpolant {f : (X → Bool) → Bool}
-    (h : A.IsInterpolantAt B [] f) : A.IsInterpolant B f :=
+    (h : A.IsInterpolantAt B ∅ f) : A.IsInterpolant B f :=
   isInterpolant_of_good h
 
 /-- A clause of `A` has the interpolant `false`. -/
 theorem CNF.isInterpolantAt_relabel_inl {d : Clause (X ⊕ Y)} (hd : d ∈ A) :
-    A.IsInterpolantAt B (d.relabel (Sum.map id Sum.inl)) fun _ => false :=
+    A.IsInterpolantAt B (d.relabel (Sum.map id Sum.inl)).toFinset fun _ => false :=
   good_false (ρA := leftPart) (ρB := rightPart) hd fun _ _ l _ he => by
     rcases l with ⟨_ | _, b⟩ <;> simpa [leftPart] using he
 
 /-- A clause of `B` has the interpolant `true`. -/
 theorem CNF.isInterpolantAt_relabel_inr {d : Clause (X ⊕ Z)} (hd : d ∈ B) :
-    A.IsInterpolantAt B (d.relabel (Sum.map id Sum.inr)) fun _ => true :=
+    A.IsInterpolantAt B (d.relabel (Sum.map id Sum.inr)).toFinset fun _ => true :=
   good_true (ρA := leftPart) (ρB := rightPart) hd fun _ _ l _ he => by
     rcases l with ⟨_ | _, b⟩ <;> simpa [rightPart] using he
 
@@ -404,14 +411,15 @@ monotone interpolant `(xᵢ ∨ f₁) ∧ f₂` for `pos = true` and `(xᵢ ∧ 
 an interpolant at the empty clause is an interpolant of `A` and `B`
 (`Cslib.Logic.PL.CNF.IsMonotoneInterpolantAt.isInterpolant`). -/
 def CNF.IsMonotoneInterpolantAt (A : CNF (X ⊕ Y)) (B : CNF (X ⊕ Z)) (pos : Bool)
-    (c : Clause (X ⊕ (Y ⊕ Z))) (f : (X → Bool) → Bool) : Prop :=
+    (c : FiniteClause (X ⊕ (Y ⊕ Z))) (f : (X → Bool) → Bool) : Prop :=
   match pos with
   | true => Good leftPos rightPart A B c f
   | false => Good leftPart rightNeg A B c f
 
+omit [DecidableEq X] [DecidableEq Y] [DecidableEq Z] in
 /-- A monotone interpolant at the empty clause is an interpolant of `A` and `B`. -/
 theorem CNF.IsMonotoneInterpolantAt.isInterpolant {pos : Bool} {f : (X → Bool) → Bool}
-    (h : A.IsMonotoneInterpolantAt B pos [] f) : A.IsInterpolant B f := by
+    (h : A.IsMonotoneInterpolantAt B pos ∅ f) : A.IsInterpolant B f := by
   cases pos <;> exact isInterpolant_of_good h
 
 /-- A clause of `A` has the monotone interpolant `false`, if the shared variables occur only
@@ -419,7 +427,7 @@ positively in `A` when `pos = true`. -/
 theorem CNF.isMonotoneInterpolantAt_relabel_inl {pos : Bool}
     (hpos : pos = true → ∀ d ∈ A, ∀ i b, (.inl i, b) ∈ d → b = true) {d : Clause (X ⊕ Y)}
     (hd : d ∈ A) :
-    A.IsMonotoneInterpolantAt B pos (d.relabel (Sum.map id Sum.inl)) fun _ => false := by
+    A.IsMonotoneInterpolantAt B pos (d.relabel (Sum.map id Sum.inl)).toFinset fun _ => false := by
   cases pos
   · exact good_false hd fun _ _ l _ he => by
       rcases l with ⟨_ | _, b⟩ <;> simpa [leftPart] using he
@@ -435,7 +443,7 @@ negatively in `B` when `pos = false`. -/
 theorem CNF.isMonotoneInterpolantAt_relabel_inr {pos : Bool}
     (hneg : pos = false → ∀ d ∈ B, ∀ i b, (.inl i, b) ∈ d → b = false) {d : Clause (X ⊕ Z)}
     (hd : d ∈ B) :
-    A.IsMonotoneInterpolantAt B pos (d.relabel (Sum.map id Sum.inr)) fun _ => true := by
+    A.IsMonotoneInterpolantAt B pos (d.relabel (Sum.map id Sum.inr)).toFinset fun _ => true := by
   cases pos
   · refine good_true hd fun a _ l hl he => ?_
     rcases l with ⟨i | _, b⟩
@@ -446,10 +454,8 @@ theorem CNF.isMonotoneInterpolantAt_relabel_inr {pos : Bool}
   · exact good_true hd fun _ _ l _ he => by
       rcases l with ⟨_ | _, b⟩ <;> simpa [rightPart] using he
 
-variable [DecidableEq X] [DecidableEq Y] [DecidableEq Z]
-
 /-- A resolution on an `A`-private variable gets the disjunction of the premises' gates. -/
-private theorem good_or (hρB : ∀ a z j, ρB a z (.inr (.inl j)) = none) {c₁ c₂ : Clause _}
+private theorem good_or (hρB : ∀ a z j, ρB a z (.inr (.inl j)) = none) {c₁ c₂ : FiniteClause _}
     {f₁ f₂ : (X → Bool) → Bool} (j : Y) (h₁ : Good ρA ρB A B c₁ f₁)
     (h₂ : Good ρA ρB A B c₂ f₂) :
     Good ρA ρB A B (c₁.resolvent c₂ (.inr (.inl j))) fun a => f₁ a || f₂ a := by
@@ -461,7 +467,7 @@ private theorem good_or (hρB : ∀ a z j, ρB a z (.inr (.inl j)) = none) {c₁
     · exact (h₂.2 a z hB hf).resolvent_right (by simp [hρB])
 
 /-- A resolution on a `B`-private variable gets the conjunction of the premises' gates. -/
-private theorem good_and (hρA : ∀ a y k, ρA a y (.inr (.inr k)) = none) {c₁ c₂ : Clause _}
+private theorem good_and (hρA : ∀ a y k, ρA a y (.inr (.inr k)) = none) {c₁ c₂ : FiniteClause _}
     {f₁ f₂ : (X → Bool) → Bool} (k : Z) (h₁ : Good ρA ρB A B c₁ f₁)
     (h₂ : Good ρA ρB A B c₂ f₂) :
     Good ρA ρB A B (c₁.resolvent c₂ (.inr (.inr k))) fun a => f₁ a && f₂ a := by
@@ -475,7 +481,7 @@ private theorem good_and (hρA : ∀ a y k, ρA a y (.inr (.inr k)) = none) {c�
 /-- A resolution on a shared variable `xᵢ` gets the selector `if xᵢ then g₂ else g₁` of the
 premises' gates: if `a i = false`, the literal `xᵢ` of `c₁` is false and the gate of `c₁` is
 selected; otherwise the literal `¬xᵢ` of `c₂` is false and the gate of `c₂` is. -/
-private theorem good_sel {c₁ c₂ : Clause _} {f₁ f₂ : (X → Bool) → Bool} (i : X)
+private theorem good_sel {c₁ c₂ : FiniteClause _} {f₁ f₂ : (X → Bool) → Bool} (i : X)
     (h₁ : Good leftPart rightPart A B c₁ f₁) (h₂ : Good leftPart rightPart A B c₂ f₂) :
     Good leftPart rightPart A B (c₁.resolvent c₂ (.inl i))
       fun a => (!a i && f₁ a) || (a i && f₂ a) := by
@@ -491,7 +497,7 @@ private theorem good_sel {c₁ c₂ : Clause _} {f₁ f₂ : (X → Bool) → Bo
 gets the monotone gate `(xᵢ ∨ g₁) ∧ g₂`. It differs from the selector only when `a i = false`,
 `g₁ = true` and `g₂ = false`; then the premise `c₂` is seen by `A` without its literal `¬xᵢ`, so
 it serves for the resolvent as well. -/
-private theorem good_posSel {c₁ c₂ : Clause _} {f₁ f₂ : (X → Bool) → Bool} (i : X)
+private theorem good_posSel {c₁ c₂ : FiniteClause _} {f₁ f₂ : (X → Bool) → Bool} (i : X)
     (h₁ : Good leftPos rightPart A B c₁ f₁) (h₂ : Good leftPos rightPart A B c₂ f₂) :
     Good leftPos rightPart A B (c₁.resolvent c₂ (.inl i)) fun a => (a i || f₁ a) && f₂ a := by
   refine ⟨fun a y hA hf => ?_, fun a z hB hf => ?_⟩
@@ -512,7 +518,7 @@ private theorem good_posSel {c₁ c₂ : Clause _} {f₁ f₂ : (X → Bool) →
 gets the monotone gate `(xᵢ ∧ g₂) ∨ g₁`. It differs from the selector only when `a i = true`,
 `g₁ = true` and `g₂ = false`; then the premise `c₁` is seen by `B` without its literal `xᵢ`, so
 it serves for the resolvent as well. -/
-private theorem good_negSel {c₁ c₂ : Clause _} {f₁ f₂ : (X → Bool) → Bool} (i : X)
+private theorem good_negSel {c₁ c₂ : FiniteClause _} {f₁ f₂ : (X → Bool) → Bool} (i : X)
     (h₁ : Good leftPart rightNeg A B c₁ f₁) (h₂ : Good leftPart rightNeg A B c₂ f₂) :
     Good leftPart rightNeg A B (c₁.resolvent c₂ (.inl i)) fun a => (a i && f₂ a) || f₁ a := by
   refine ⟨fun a y hA hf => ?_, fun a z hB hf => ?_⟩
@@ -531,7 +537,7 @@ private theorem good_negSel {c₁ c₂ : Clause _} {f₁ f₂ : (X → Bool) →
 
 /-- A resolution on a shared variable `xᵢ` has the interpolant `if xᵢ then f₂ else f₁`, for
 interpolants `f₁` and `f₂` at its premises. -/
-theorem CNF.IsInterpolantAt.resolvent_inl {c₁ c₂ : Clause (X ⊕ (Y ⊕ Z))}
+theorem CNF.IsInterpolantAt.resolvent_inl {c₁ c₂ : FiniteClause (X ⊕ (Y ⊕ Z))}
     {f₁ f₂ : (X → Bool) → Bool} (i : X) (h₁ : A.IsInterpolantAt B c₁ f₁)
     (h₂ : A.IsInterpolantAt B c₂ f₂) :
     A.IsInterpolantAt B (c₁.resolvent c₂ (.inl i)) fun a => (!a i && f₁ a) || (a i && f₂ a) :=
@@ -539,7 +545,7 @@ theorem CNF.IsInterpolantAt.resolvent_inl {c₁ c₂ : Clause (X ⊕ (Y ⊕ Z))}
 
 /-- A resolution on an `A`-private variable has the interpolant `f₁ ∨ f₂`, for interpolants `f₁`
 and `f₂` at its premises. -/
-theorem CNF.IsInterpolantAt.resolvent_inr_inl {c₁ c₂ : Clause (X ⊕ (Y ⊕ Z))}
+theorem CNF.IsInterpolantAt.resolvent_inr_inl {c₁ c₂ : FiniteClause (X ⊕ (Y ⊕ Z))}
     {f₁ f₂ : (X → Bool) → Bool} (j : Y) (h₁ : A.IsInterpolantAt B c₁ f₁)
     (h₂ : A.IsInterpolantAt B c₂ f₂) :
     A.IsInterpolantAt B (c₁.resolvent c₂ (.inr (.inl j))) fun a => f₁ a || f₂ a :=
@@ -547,7 +553,7 @@ theorem CNF.IsInterpolantAt.resolvent_inr_inl {c₁ c₂ : Clause (X ⊕ (Y ⊕ 
 
 /-- A resolution on a `B`-private variable has the interpolant `f₁ ∧ f₂`, for interpolants `f₁`
 and `f₂` at its premises. -/
-theorem CNF.IsInterpolantAt.resolvent_inr_inr {c₁ c₂ : Clause (X ⊕ (Y ⊕ Z))}
+theorem CNF.IsInterpolantAt.resolvent_inr_inr {c₁ c₂ : FiniteClause (X ⊕ (Y ⊕ Z))}
     {f₁ f₂ : (X → Bool) → Bool} (k : Z) (h₁ : A.IsInterpolantAt B c₁ f₁)
     (h₂ : A.IsInterpolantAt B c₂ f₂) :
     A.IsInterpolantAt B (c₁.resolvent c₂ (.inr (.inr k))) fun a => f₁ a && f₂ a :=
@@ -556,7 +562,7 @@ theorem CNF.IsInterpolantAt.resolvent_inr_inr {c₁ c₂ : Clause (X ⊕ (Y ⊕ 
 /-- For `pos = true`, a resolution on a shared variable `xᵢ` has the monotone interpolant
 `(xᵢ ∨ f₁) ∧ f₂`, for monotone interpolants `f₁` and `f₂` at its premises
 [Pudlák, proof of Theorem 2][Pudlak1997]. -/
-theorem CNF.IsMonotoneInterpolantAt.resolvent_inl_true {c₁ c₂ : Clause (X ⊕ (Y ⊕ Z))}
+theorem CNF.IsMonotoneInterpolantAt.resolvent_inl_true {c₁ c₂ : FiniteClause (X ⊕ (Y ⊕ Z))}
     {f₁ f₂ : (X → Bool) → Bool} (i : X) (h₁ : A.IsMonotoneInterpolantAt B true c₁ f₁)
     (h₂ : A.IsMonotoneInterpolantAt B true c₂ f₂) :
     A.IsMonotoneInterpolantAt B true (c₁.resolvent c₂ (.inl i)) fun a => (a i || f₁ a) && f₂ a :=
@@ -564,7 +570,7 @@ theorem CNF.IsMonotoneInterpolantAt.resolvent_inl_true {c₁ c₂ : Clause (X �
 
 /-- For `pos = false`, a resolution on a shared variable `xᵢ` has the monotone interpolant
 `(xᵢ ∧ f₂) ∨ f₁`, for monotone interpolants `f₁` and `f₂` at its premises. -/
-theorem CNF.IsMonotoneInterpolantAt.resolvent_inl_false {c₁ c₂ : Clause (X ⊕ (Y ⊕ Z))}
+theorem CNF.IsMonotoneInterpolantAt.resolvent_inl_false {c₁ c₂ : FiniteClause (X ⊕ (Y ⊕ Z))}
     {f₁ f₂ : (X → Bool) → Bool} (i : X) (h₁ : A.IsMonotoneInterpolantAt B false c₁ f₁)
     (h₂ : A.IsMonotoneInterpolantAt B false c₂ f₂) :
     A.IsMonotoneInterpolantAt B false (c₁.resolvent c₂ (.inl i)) fun a => (a i && f₂ a) || f₁ a :=
@@ -573,7 +579,7 @@ theorem CNF.IsMonotoneInterpolantAt.resolvent_inl_false {c₁ c₂ : Clause (X �
 /-- A resolution on an `A`-private variable has the monotone interpolant `f₁ ∨ f₂`, for monotone
 interpolants `f₁` and `f₂` at its premises. -/
 theorem CNF.IsMonotoneInterpolantAt.resolvent_inr_inl {pos : Bool}
-    {c₁ c₂ : Clause (X ⊕ (Y ⊕ Z))} {f₁ f₂ : (X → Bool) → Bool} (j : Y)
+    {c₁ c₂ : FiniteClause (X ⊕ (Y ⊕ Z))} {f₁ f₂ : (X → Bool) → Bool} (j : Y)
     (h₁ : A.IsMonotoneInterpolantAt B pos c₁ f₁) (h₂ : A.IsMonotoneInterpolantAt B pos c₂ f₂) :
     A.IsMonotoneInterpolantAt B pos (c₁.resolvent c₂ (.inr (.inl j))) fun a => f₁ a || f₂ a := by
   cases pos
@@ -582,7 +588,7 @@ theorem CNF.IsMonotoneInterpolantAt.resolvent_inr_inl {pos : Bool}
 /-- A resolution on a `B`-private variable has the monotone interpolant `f₁ ∧ f₂`, for monotone
 interpolants `f₁` and `f₂` at its premises. -/
 theorem CNF.IsMonotoneInterpolantAt.resolvent_inr_inr {pos : Bool}
-    {c₁ c₂ : Clause (X ⊕ (Y ⊕ Z))} {f₁ f₂ : (X → Bool) → Bool} (k : Z)
+    {c₁ c₂ : FiniteClause (X ⊕ (Y ⊕ Z))} {f₁ f₂ : (X → Bool) → Bool} (k : Z)
     (h₁ : A.IsMonotoneInterpolantAt B pos c₁ f₁) (h₂ : A.IsMonotoneInterpolantAt B pos c₂ f₂) :
     A.IsMonotoneInterpolantAt B pos (c₁.resolvent c₂ (.inr (.inr k))) fun a => f₁ a && f₂ a := by
   cases pos
@@ -613,18 +619,21 @@ private theorem exists_circuit_of_good {σ : Signature} {I : Interpretation σ B
       Synthesis I (inputs n ∪ {f₁, f₂}) {fun a => f₁ a || f₂ a} cost)
     (hand : ∀ f₁ f₂ : (Fin n → Bool) → Bool,
       Synthesis I (inputs n ∪ {f₁, f₂}) {fun a => f₁ a && f₂ a} cost)
-    (hshared : ∀ (i : Fin n) (c₁ c₂ : Clause (Fin n ⊕ (Y ⊕ Z))) (f₁ f₂ : (Fin n → Bool) → Bool),
+    (hshared : ∀ (i : Fin n) (c₁ c₂ : FiniteClause (Fin n ⊕ (Y ⊕ Z)))
+      (f₁ f₂ : (Fin n → Bool) → Bool),
       Good ρA ρB A B c₁ f₁ → Good ρA ρB A B c₂ f₂ →
         ∃ f, Good ρA ρB A B (c₁.resolvent c₂ (.inl i)) f ∧
           Synthesis I (inputs n ∪ {f₁, f₂}) {f} cost)
-    {ls : List (Clause (Fin n ⊕ (Y ⊕ Z)))} (h : (A.appendShared B).IsProof ls) (hnil : [] ∈ ls) :
+    {ls : List (FiniteClause (Fin n ⊕ (Y ⊕ Z)))}
+    (h : (A.appendShared B).toClauseSet.IsProof ls) (hnil : ∅ ∈ ls) :
     ∃ C : Circuit σ n 1, C.size ≤ cost * ls.length ∧
       A.IsInterpolant B fun a => C.eval I a 0 := by
-  have hmem (c : Clause (Fin n ⊕ (Y ⊕ Z))) (hc : c ∈ A.appendShared B) :
+  have hmem (c : FiniteClause (Fin n ⊕ (Y ⊕ Z))) (hc : c ∈ (A.appendShared B).toClauseSet) :
       ∃ f, Good ρA ρB A B c f ∧ Synthesis I (inputs n) {f} cost := by
-    rcases List.mem_append.1 hc with hc | hc <;> obtain ⟨d, hd, rfl⟩ := List.mem_map.1 hc
+    obtain ⟨e, he, rfl⟩ := CNF.mem_toClauseSet.1 hc
+    rcases List.mem_append.1 he with he | he <;> obtain ⟨d, hd, rfl⟩ := List.mem_map.1 he
     exacts [⟨_, good_false hd (hA d hd), hconst false⟩, ⟨_, good_true hd (hB d hd), hconst true⟩]
-  have hres (c₁ c₂ : Clause (Fin n ⊕ (Y ⊕ Z))) (v : Fin n ⊕ (Y ⊕ Z))
+  have hres (c₁ c₂ : FiniteClause (Fin n ⊕ (Y ⊕ Z))) (v : Fin n ⊕ (Y ⊕ Z))
       (f₁ f₂ : (Fin n → Bool) → Bool) (_ : (v, true) ∈ c₁) (_ : (v, false) ∈ c₂)
       (h₁ : Good ρA ρB A B c₁ f₁) (h₂ : Good ρA ρB A B c₂ f₂) :
       ∃ f, Good ρA ρB A B (c₁.resolvent c₂ v) f ∧
@@ -632,7 +641,7 @@ private theorem exists_circuit_of_good {σ : Signature} {I : Interpretation σ B
     rcases v with i | j | k
     exacts [hshared i c₁ c₂ f₁ f₂ h₁ h₂, ⟨_, good_or hρB j h₁ h₂, hor f₁ f₂⟩,
       ⟨_, good_and hρA k h₁ h₂, hand f₁ f₂⟩]
-  obtain ⟨f, hf, C, hC, hsize⟩ := IsProof.exists_circuit (Good ρA ρB A B) hmem hres h hnil
+  obtain ⟨f, hf, C, hC, hsize⟩ := ClauseSet.IsProof.exists_circuit (Good ρA ρB A B) hmem hres h hnil
   refine ⟨C, hsize, ?_⟩
   have hCf : (fun a => C.eval I a 0) = f := funext fun a => by rw [hC a, single_apply]
   exact hCf ▸ isInterpolant_of_good hf
@@ -659,8 +668,8 @@ private theorem synthesis_input {σ : Signature} {I : Interpretation σ Bool}
 [Krajíček, Theorem 6.1][Krajicek1997]. A resolution refutation of `A(x, y) ∧ B(x, z)` with `s`
 lines gives an interpolant of `A` and `B` computed by a De Morgan circuit with at most `4 s`
 gates. -/
-theorem CNF.IsProof.exists_interpolant {ls : List (Clause (Fin n ⊕ (Y ⊕ Z)))}
-    (h : (A.appendShared B).IsProof ls) (hnil : [] ∈ ls) :
+theorem ClauseSet.IsProof.exists_interpolant {ls : List (FiniteClause (Fin n ⊕ (Y ⊕ Z)))}
+    (h : (A.appendShared B).toClauseSet.IsProof ls) (hnil : ∅ ∈ ls) :
     ∃ C : Circuit Boolean.signature n 1, C.size ≤ 4 * ls.length ∧
       A.IsInterpolant B fun a => C.eval Boolean.interpretation a 0 := by
   refine exists_circuit_of_good (ρA := leftPart) (ρB := rightPart) (fun _ _ _ => rfl)
@@ -680,7 +689,8 @@ theorem CNF.IsProof.exists_interpolant {ls : List (Clause (Fin n ⊕ (Y ⊕ Z)))
 /-- **Feasible interpolation for resolution**, by refutation size: if `A(x, y) ∧ B(x, z)` has a
 resolution refutation with at most `s` lines, then `A` and `B` have an interpolant computed by a
 De Morgan circuit with at most `4 s` gates. -/
-theorem CNF.RefutableInSize.exists_interpolant {s : ℕ} (h : (A.appendShared B).RefutableInSize s) :
+theorem ClauseSet.RefutableInSize.exists_interpolant {s : ℕ}
+    (h : (A.appendShared B).toClauseSet.RefutableInSize s) :
     ∃ C : Circuit Boolean.signature n 1, C.size ≤ 4 * s ∧
       A.IsInterpolant B fun a => C.eval Boolean.interpretation a 0 := by
   obtain ⟨ls, h, hnil, hlen⟩ := h
@@ -706,8 +716,9 @@ private theorem monotone_gates :
 positively in `A` [Pudlák, Theorem 2][Pudlak1997], [Krajíček, Theorem 6.1][Krajicek1997]. A
 resolution refutation of `A(x, y) ∧ B(x, z)` with `s` lines gives an interpolant of `A` and `B`
 computed by a monotone circuit with at most `2 s` gates. -/
-theorem CNF.IsProof.exists_monotone_interpolant_of_positive
-    {ls : List (Clause (Fin n ⊕ (Y ⊕ Z)))} (h : (A.appendShared B).IsProof ls) (hnil : [] ∈ ls)
+theorem ClauseSet.IsProof.exists_monotone_interpolant_of_positive
+    {ls : List (FiniteClause (Fin n ⊕ (Y ⊕ Z)))}
+    (h : (A.appendShared B).toClauseSet.IsProof ls) (hnil : ∅ ∈ ls)
     (hpos : ∀ d ∈ A, ∀ i b, (.inl i, b) ∈ d → b = true) :
     ∃ C : Circuit Monotone.signature n 1, C.size ≤ 2 * ls.length ∧
       A.IsInterpolant B fun a => C.eval Monotone.interpretation a 0 := by
@@ -729,8 +740,9 @@ theorem CNF.IsProof.exists_monotone_interpolant_of_positive
 negatively in `B` [Pudlák, Theorem 2][Pudlak1997], [Krajíček, Theorem 6.1][Krajicek1997]. A
 resolution refutation of `A(x, y) ∧ B(x, z)` with `s` lines gives an interpolant of `A` and `B`
 computed by a monotone circuit with at most `2 s` gates. -/
-theorem CNF.IsProof.exists_monotone_interpolant_of_negative
-    {ls : List (Clause (Fin n ⊕ (Y ⊕ Z)))} (h : (A.appendShared B).IsProof ls) (hnil : [] ∈ ls)
+theorem ClauseSet.IsProof.exists_monotone_interpolant_of_negative
+    {ls : List (FiniteClause (Fin n ⊕ (Y ⊕ Z)))}
+    (h : (A.appendShared B).toClauseSet.IsProof ls) (hnil : ∅ ∈ ls)
     (hneg : ∀ d ∈ B, ∀ i b, (.inl i, b) ∈ d → b = false) :
     ∃ C : Circuit Monotone.signature n 1, C.size ≤ 2 * ls.length ∧
       A.IsInterpolant B fun a => C.eval Monotone.interpretation a 0 := by
@@ -750,8 +762,9 @@ theorem CNF.IsProof.exists_monotone_interpolant_of_negative
 
 /-- **Monotone feasible interpolation for resolution**, by refutation size, when the shared
 variables occur only positively in `A`. -/
-theorem CNF.RefutableInSize.exists_monotone_interpolant_of_positive {s : ℕ}
-    (h : (A.appendShared B).RefutableInSize s) (hpos : ∀ d ∈ A, ∀ i b, (.inl i, b) ∈ d → b = true) :
+theorem ClauseSet.RefutableInSize.exists_monotone_interpolant_of_positive {s : ℕ}
+    (h : (A.appendShared B).toClauseSet.RefutableInSize s)
+    (hpos : ∀ d ∈ A, ∀ i b, (.inl i, b) ∈ d → b = true) :
     ∃ C : Circuit Monotone.signature n 1, C.size ≤ 2 * s ∧
       A.IsInterpolant B fun a => C.eval Monotone.interpretation a 0 := by
   obtain ⟨ls, h, hnil, hlen⟩ := h
@@ -760,8 +773,8 @@ theorem CNF.RefutableInSize.exists_monotone_interpolant_of_positive {s : ℕ}
 
 /-- **Monotone feasible interpolation for resolution**, by refutation size, when the shared
 variables occur only negatively in `B`. -/
-theorem CNF.RefutableInSize.exists_monotone_interpolant_of_negative {s : ℕ}
-    (h : (A.appendShared B).RefutableInSize s)
+theorem ClauseSet.RefutableInSize.exists_monotone_interpolant_of_negative {s : ℕ}
+    (h : (A.appendShared B).toClauseSet.RefutableInSize s)
     (hneg : ∀ d ∈ B, ∀ i b, (.inl i, b) ∈ d → b = false) :
     ∃ C : Circuit Monotone.signature n 1, C.size ≤ 2 * s ∧
       A.IsInterpolant B fun a => C.eval Monotone.interpretation a 0 := by

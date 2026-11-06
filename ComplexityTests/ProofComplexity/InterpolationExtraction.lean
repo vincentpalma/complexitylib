@@ -49,16 +49,16 @@ private def lines : List (Clause (ℕ ⊕ (Unit ⊕ Unit))) :=
   [[], [(x, false)], [(x, true)], [(z, false), (x, false)], [(z, true)],
     [(y, false), (x, true)], [(y, true)]]
 
-private theorem isProof : (A.appendShared B).IsProof lines := by
-  have h₄ : (A.appendShared B).IsProof
-      [[(z, false), (x, false)], [(z, true)], [(y, false), (x, true)], [(y, true)]] :=
-    (((CNF.IsProof.nil.mem (by decide)).mem (by decide)).mem (by decide)).mem (by decide)
-  have h₅ := h₄.resolvent (c₁ := [(y, true)]) (c₂ := [(y, false), (x, true)]) y (by decide)
+private theorem isProof : (A.appendShared B).toClauseSet.IsProof (lines.map List.toFinset) := by
+  have h₄ : (A.appendShared B).toClauseSet.IsProof
+      [{(z, false), (x, false)}, {(z, true)}, {(y, false), (x, true)}, {(y, true)}] :=
+    (((ClauseSet.IsProof.nil.mem (by decide)).mem (by decide)).mem (by decide)).mem (by decide)
+  have h₅ := h₄.resolvent (c₁ := {(y, true)}) (c₂ := {(y, false), (x, true)}) y (by decide)
     (by decide) (by decide) (by decide)
-  have h₆ := h₅.resolvent (c₁ := [(z, true)]) (c₂ := [(z, false), (x, false)]) z (by decide)
+  have h₆ := h₅.resolvent (c₁ := {(z, true)}) (c₂ := {(z, false), (x, false)}) z (by decide)
     (by decide) (by decide) (by decide)
-  exact h₆.resolvent (c₁ := [(x, true)]) (c₂ := [(x, false)]) x (by decide) (by decide)
-    (by decide) (by decide)
+  convert h₆.resolvent (c₁ := {(x, true)}) (c₂ := {(x, false)}) x (by decide) (by decide)
+    (by decide) (by decide) using 1; decide
 
 /-- The extracted code: four gates per line. The clauses of `A` get `false`, those of `B` get
 `true`, the resolutions on `y` and `z` a disjunction and a conjunction, and the last line the
@@ -99,6 +99,30 @@ example : ∃ C : Circuit signature 1 1,
   have ha : a = fun _ => a 0 := funext fun i => by rw [Subsingleton.elim i 0]
   rw [ha]
   exact key (a 0)
+
+/-- Repeated and permuted literal syntax represents the same seven finite clauses. -/
+private def repeatedLines : List (Clause (ℕ ⊕ (Unit ⊕ Unit))) :=
+  [[], [(x, false), (x, false)], [(x, true), (x, true)],
+    [(x, false), (z, false), (x, false)], [(z, true), (z, true)],
+    [(x, true), (y, false), (y, false)], [(y, true), (y, true)]]
+
+private theorem repeated_isProof :
+    (A.appendShared B).toClauseSet.IsProof (repeatedLines.map List.toFinset) := by
+  have hsame : repeatedLines.map List.toFinset = lines.map List.toFinset := by decide
+  rw [hsame]
+  exact isProof
+
+/-- Axiom and resolvent search ignore the presentation of a finite clause. Both builders still
+produce the same circuits and keep their exact gate counts. -/
+example : CNF.interpolantCode 1 A B repeatedLines = CNF.interpolantCode 1 A B lines ∧
+    CNF.monotoneInterpolantCode 1 A B repeatedLines = CNF.monotoneInterpolantCode 1 A B lines := by
+  decide
+
+/-- The correctness theorem accepts the permuted, repeated certificate with all 28 gates. -/
+example : ∃ C : Circuit signature 1 1,
+    Circuit.ofCode 1 1 (CNF.interpolantCode 1 A B repeatedLines) = some C ∧ C.size = 28 ∧
+      A.IsInterpolant B fun a => C.eval interpretation (fun i => a i) 0 :=
+  repeated_isProof.ofCode_interpolantCode (by decide) (by simp [A]) (by simp [B])
 
 /-! ### Swapped polarities -/
 
@@ -195,16 +219,16 @@ example : ∃ C : Circuit Monotone.signature 1 1,
 positively in it. -/
 private def A₂ : CNF (ℕ ⊕ Unit) := A ++ [[(.inl 1, false), (.inr (), true)]]
 
-private theorem isProof₂ : (A₂.appendShared B).IsProof lines := by
-  have h₄ : (A₂.appendShared B).IsProof
-      [[(z, false), (x, false)], [(z, true)], [(y, false), (x, true)], [(y, true)]] :=
-    (((CNF.IsProof.nil.mem (by decide)).mem (by decide)).mem (by decide)).mem (by decide)
-  have h₅ := h₄.resolvent (c₁ := [(y, true)]) (c₂ := [(y, false), (x, true)]) y (by decide)
+private theorem isProof₂ : (A₂.appendShared B).toClauseSet.IsProof (lines.map List.toFinset) := by
+  have h₄ : (A₂.appendShared B).toClauseSet.IsProof
+      [{(z, false), (x, false)}, {(z, true)}, {(y, false), (x, true)}, {(y, true)}] :=
+    (((ClauseSet.IsProof.nil.mem (by decide)).mem (by decide)).mem (by decide)).mem (by decide)
+  have h₅ := h₄.resolvent (c₁ := {(y, true)}) (c₂ := {(y, false), (x, true)}) y (by decide)
     (by decide) (by decide) (by decide)
-  have h₆ := h₅.resolvent (c₁ := [(z, true)]) (c₂ := [(z, false), (x, false)]) z (by decide)
+  have h₆ := h₅.resolvent (c₁ := {(z, true)}) (c₂ := {(z, false), (x, false)}) z (by decide)
     (by decide) (by decide) (by decide)
-  exact h₆.resolvent (c₁ := [(x, true)]) (c₂ := [(x, false)]) x (by decide) (by decide)
-    (by decide) (by decide)
+  convert h₆.resolvent (c₁ := {(x, true)}) (c₂ := {(x, false)}) x (by decide) (by decide)
+    (by decide) (by decide) using 1; decide
 
 /-- With two inputs and `A₂`, the last line gets the dual gate `(x₀ ∧ c₂) ∨ c₁`, and the code
 computes `x₀`. -/
